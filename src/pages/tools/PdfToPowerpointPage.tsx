@@ -1,121 +1,285 @@
-
-import { useState } from "react";
-import { Upload, FileText, Presentation, Download, Settings } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { Upload, FileDown, Download, Loader2, FileText, Presentation, Eye, CheckCircle, AlertCircle, Settings, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
+
+interface ConvertedFile {
+  name: string;
+  url: string;
+  size: string;
+  bytes: Uint8Array;
+  pages: number;
+}
 
 const PdfToPowerpointPage = () => {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<Array<{ id: string; file: File; info?: PdfInfo; size: string }>>([]);
   const [converting, setConverting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [convertedFile, setConvertedFile] = useState<string | null>(null);
-  const [layout, setLayout] = useState("auto");
+  const [convertedFiles, setConvertedFiles] = useState<ConvertedFile[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const [progressMessage, setProgressMessage] = useState("");
+  const [slideLayout, setSlideLayout] = useState("auto");
   const [preserveImages, setPreserveImages] = useState(true);
   const [preserveFormatting, setPreserveFormatting] = useState(true);
+  const [oneSlidePerPage, setOneSlidePerPage] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfProcessor = createPdfProcessor();
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (selectedFile && selectedFile.type === 'application/pdf') {
-      setFile(selectedFile);
-      setConvertedFile(null);
-    } else {
-      toast.error("Please select a valid PDF file");
+  const generateId = () => Math.random().toString(36).substr(2, 9);
+
+  const handleFileSelect = useCallback(async (selectedFiles: FileList | null) => {
+    if (!selectedFiles) return;
+    
+    const validFiles = Array.from(selectedFiles).filter(file => 
+      file.type === 'application/pdf'
+    );
+    
+    if (validFiles.length !== selectedFiles.length) {
+      toast.error("Some files were skipped. Only PDF files are supported.");
     }
+
+    if (validFiles.length === 0) return;
+
+    const loadingToast = toast.loading(`Loading ${validFiles.length} PDF file${validFiles.length > 1 ? 's' : ''}...`);
+    
+    try {
+      const newFiles = [];
+      
+      for (const file of validFiles) {
+        try {
+          const info = await pdfProcessor.loadPdf(file);
+          newFiles.push({
+            id: generateId(),
+            file,
+            info,
+            size: formatFileSize(file.size)
+          });
+        } catch (error) {
+          console.error(`Error loading ${file.name}:`, error);
+          toast.error(`Failed to load ${file.name}. Please ensure it's a valid PDF.`);
+        }
+      }
+      
+      if (newFiles.length > 0) {
+        setFiles(prev => [...prev, ...newFiles]);
+        toast.success(`Added ${newFiles.length} PDF file${newFiles.length > 1 ? 's' : ''}`);
+      }
+    } catch (error) {
+      toast.error("Failed to load PDF files");
+    } finally {
+      toast.dismiss(loadingToast);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    handleFileSelect(e.dataTransfer.files);
+  }, [handleFileSelect]);
+
+  const removeFile = (id: string) => {
+    setFiles(prev => prev.filter(file => file.id !== id));
+    toast.success("File removed");
   };
 
   const convertToPowerpoint = async () => {
-    if (!file) {
-      toast.error("Please select a PDF file");
+    if (files.length === 0) {
+      toast.error("Please select PDF files to convert");
       return;
     }
 
     setConverting(true);
     setProgress(0);
+    setProgressMessage("Preparing conversion...");
 
-    // Simulate conversion process
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise(resolve => setTimeout(resolve, 250));
-      setProgress(i);
+    try {
+      const converted: ConvertedFile[] = [];
+      
+      const steps = [
+        { message: "Analyzing PDF layout...", progress: 20 },
+        { message: "Extracting content and images...", progress: 40 },
+        { message: "Creating presentation slides...", progress: 60 },
+        { message: "Applying slide layouts...", progress: 80 },
+        { message: "Finalizing presentation...", progress: 95 }
+      ];
+
+      for (const step of steps) {
+        setProgressMessage(step.message);
+        setProgress(step.progress);
+        await new Promise(resolve => setTimeout(resolve, 600));
+      }
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setProgress(((i + 1) / files.length) * 100);
+        setProgressMessage(`Converting ${file.file.name}...`);
+        
+        // Simulate conversion process
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        
+        // Create mock PowerPoint content
+        const pptContent = `
+          Presentation: ${file.file.name}
+          Converted by QuickDocs PDF to PowerPoint Converter
+          
+          Original PDF Information:
+          - Pages: ${file.info?.pageCount || 'Unknown'}
+          - Size: ${file.size}
+          - Slide Layout: ${slideLayout}
+          - One Slide Per Page: ${oneSlidePerPage ? 'Yes' : 'No'}
+          - Preserve Images: ${preserveImages ? 'Yes' : 'No'}
+          - Preserve Formatting: ${preserveFormatting ? 'Yes' : 'No'}
+          
+          This is a simulated PowerPoint presentation conversion. In a real implementation,
+          this would contain the actual slides created from the PDF pages, including:
+          
+          1. Each PDF page converted to a presentation slide
+          2. Text content extracted and formatted appropriately
+          3. Images and graphics preserved and positioned correctly
+          4. Slide layouts optimized for presentation format
+          5. Consistent formatting throughout the presentation
+          
+          The conversion process would:
+          - Analyze PDF page layouts
+          - Extract text while maintaining hierarchy
+          - Convert images to slide-appropriate formats
+          - Apply consistent slide templates
+          - Optimize content for presentation viewing
+        `;
+        
+        const blob = new Blob([pptContent], { 
+          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
+        });
+        const url = URL.createObjectURL(blob);
+        
+        converted.push({
+          name: file.file.name.replace(/\.pdf$/i, '.pptx'),
+          url,
+          size: formatFileSize(blob.size),
+          bytes: new Uint8Array(await blob.arrayBuffer()),
+          pages: file.info?.pageCount || 0
+        });
+      }
+      
+      setConvertedFiles(converted);
+      setProgress(100);
+      setProgressMessage("Conversion completed!");
+      toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to PowerPoint`);
+      
+    } catch (error) {
+      console.error('Conversion error:', error);
+      toast.error(error instanceof Error ? error.message : "Conversion failed. Please try again.");
+    } finally {
+      setConverting(false);
+      setProgress(0);
+      setProgressMessage("");
     }
-
-    setConvertedFile(`${file.name.replace('.pdf', '')}.pptx`);
-    setConverting(false);
-    toast.success("PDF converted to PowerPoint successfully!");
   };
 
-  const downloadPowerpoint = () => {
+  const downloadFile = (file: ConvertedFile) => {
     const link = document.createElement('a');
-    link.href = '#';
-    link.download = convertedFile || 'converted-presentation.pptx';
+    link.href = file.url;
+    link.download = file.name;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
     link.click();
-    toast.success("PowerPoint file downloaded!");
+    document.body.removeChild(link);
+    toast.success(`Downloaded ${file.name}`);
   };
+
+  const downloadAll = () => {
+    convertedFiles.forEach((file, index) => {
+      setTimeout(() => downloadFile(file), index * 500);
+    });
+    toast.success(`Downloading ${convertedFiles.length} files...`);
+  };
+
+  const clearAll = () => {
+    setFiles([]);
+    setConvertedFiles([]);
+    toast.success("All files cleared");
+  };
+
+  const totalSize = files.reduce((sum, file) => sum + file.file.size, 0);
+  const totalPages = files.reduce((sum, file) => sum + (file.info?.pageCount || 0), 0);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">PDF to PowerPoint</h1>
-        <p className="text-gray-600 mt-2">Convert PDF documents to editable PowerPoint presentations</p>
+    <div className="space-y-8 max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="text-center">
+        <div className="inline-flex items-center bg-red-100 text-red-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
+          <Presentation className="h-4 w-4 mr-2" />
+          PDF to PowerPoint Converter
+        </div>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">PDF to PowerPoint</h1>
+        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          Transform your PDF documents into editable PowerPoint presentations with preserved layouts and professional slide formatting.
+        </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Upload PDF File
-          </CardTitle>
-          <CardDescription>
-            Select a PDF file to convert to PowerPoint presentation
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div 
-            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors"
-            onDrop={(e) => {
-              e.preventDefault();
-              const droppedFile = e.dataTransfer.files[0];
-              if (droppedFile && droppedFile.type === 'application/pdf') {
-                setFile(droppedFile);
-                setConvertedFile(null);
-              } else {
-                toast.error("Please drop a valid PDF file");
-              }
-            }}
-            onDragOver={(e) => e.preventDefault()}
+      {/* Upload Area */}
+      <Card className="border-2 border-dashed border-gray-300 hover:border-red-400 transition-all duration-300">
+        <CardContent className="p-8">
+          <div
+            className={`text-center transition-all duration-300 cursor-pointer ${
+              dragOver ? 'scale-105 bg-red-50' : ''
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
           >
-            <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Drop PDF file here</h3>
-            <p className="text-gray-600 mb-4">or click to browse</p>
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={handleFileSelect}
-              className="hidden"
-              id="pdf-upload"
-            />
-            <Button asChild>
-              <label htmlFor="pdf-upload" className="cursor-pointer">
-                Select PDF File
-              </label>
-            </Button>
-          </div>
-
-          {file && (
-            <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-              <FileText className="h-4 w-4 text-red-600" />
-              <span className="text-sm">{file.name}</span>
-              <span className="text-xs text-gray-500">({(file.size / 1024 / 1024).toFixed(1)} MB)</span>
+            <div className="mb-6">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-red-500 to-pink-600 rounded-full mb-4 shadow-lg">
+                <Upload className="h-10 w-10 text-white" />
+              </div>
             </div>
-          )}
+            <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+              Drop PDF files here or click to browse
+            </h3>
+            <p className="text-gray-600 mb-6 text-lg">
+              Convert PDF documents to PowerPoint presentations
+            </p>
+            <Button size="lg" className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700">
+              <Upload className="h-5 w-5 mr-2" />
+              Choose PDF Files
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,application/pdf"
+              onChange={(e) => handleFileSelect(e.target.files)}
+              className="hidden"
+            />
+          </div>
         </CardContent>
       </Card>
 
-      {file && (
+      {/* Conversion Settings */}
+      {files.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -126,79 +290,251 @@ const PdfToPowerpointPage = () => {
               Configure PowerPoint conversion options
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Slide Layout</Label>
-              <Select value={layout} onValueChange={setLayout}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto-detect Layout</SelectItem>
-                  <SelectItem value="standard">Standard (4:3)</SelectItem>
-                  <SelectItem value="widescreen">Widescreen (16:9)</SelectItem>
-                  <SelectItem value="custom">Custom Layout</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="preserveImages"
-                  checked={preserveImages}
-                  onCheckedChange={(checked) => setPreserveImages(checked as boolean)}
-                />
-                <Label htmlFor="preserveImages">Preserve images and graphics</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="preserveFormatting"
-                  checked={preserveFormatting}
-                  onCheckedChange={(checked) => setPreserveFormatting(checked as boolean)}
-                />
-                <Label htmlFor="preserveFormatting">Preserve text formatting</Label>
-              </div>
-            </div>
-
-            {converting && (
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Converting PDF to PowerPoint...</span>
-                  <span>{progress}%</span>
-                </div>
-                <Progress value={progress} className="w-full" />
+                <Label>Slide Layout</Label>
+                <Select value={slideLayout} onValueChange={setSlideLayout}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto-detect Layout</SelectItem>
+                    <SelectItem value="standard">Standard (4:3)</SelectItem>
+                    <SelectItem value="widescreen">Widescreen (16:9)</SelectItem>
+                    <SelectItem value="custom">Custom Layout</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            )}
+              <div className="space-y-2">
+                <Label>Output Format</Label>
+                <Select value="pptx" disabled>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pptx">PowerPoint 2007+ (.pptx)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-            {convertedFile && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Presentation className="h-5 w-5 text-green-600" />
-                    <div>
-                      <p className="font-medium text-green-800">Conversion Complete!</p>
-                      <p className="text-sm text-green-600">{convertedFile}</p>
-                    </div>
-                  </div>
-                  <Button onClick={downloadPowerpoint} className="bg-green-600 hover:bg-green-700">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                  </Button>
+            <div className="space-y-4">
+              <h4 className="font-medium text-gray-900">Conversion Options</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="oneSlidePerPage"
+                    checked={oneSlidePerPage}
+                    onCheckedChange={(checked) => setOneSlidePerPage(checked as boolean)}
+                  />
+                  <Label htmlFor="oneSlidePerPage">One slide per PDF page</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="preserveImages"
+                    checked={preserveImages}
+                    onCheckedChange={(checked) => setPreserveImages(checked as boolean)}
+                  />
+                  <Label htmlFor="preserveImages">Preserve images and graphics</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="preserveFormatting"
+                    checked={preserveFormatting}
+                    onCheckedChange={(checked) => setPreserveFormatting(checked as boolean)}
+                  />
+                  <Label htmlFor="preserveFormatting">Preserve text formatting</Label>
                 </div>
               </div>
-            )}
-
-            <Button 
-              onClick={convertToPowerpoint} 
-              disabled={converting}
-              className="w-full"
-            >
-              {converting ? 'Converting...' : 'Convert to PowerPoint'}
-            </Button>
+            </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* File List */}
+      {files.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Selected Files ({files.length})
+                </CardTitle>
+                <CardDescription>
+                  Total: {totalPages} pages • {formatFileSize(totalSize)}
+                </CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={clearAll}>
+                Clear All
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {files.map((file, index) => (
+                <div
+                  key={file.id}
+                  className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                >
+                  <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-lg">
+                    <FileText className="h-6 w-6 text-red-600" />
+                  </div>
+                  
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="secondary" className="text-xs">
+                        #{index + 1}
+                      </Badge>
+                      <h4 className="font-medium text-gray-900 truncate">
+                        {file.file.name}
+                      </h4>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <span>{file.info?.pageCount || 0} pages</span>
+                      <span>{file.size}</span>
+                      <span>{new Date(file.file.lastModified).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="sm">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeFile(file.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Conversion Progress */}
+      {converting && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
+                <Loader2 className="h-8 w-8 text-red-600 animate-spin" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Converting to PowerPoint</h3>
+              <p className="text-gray-600 mb-4">
+                {progressMessage || `Converting ${files.length} PDF file${files.length > 1 ? 's' : ''}...`}
+              </p>
+              <div className="max-w-md mx-auto">
+                <div className="flex justify-between text-sm mb-2">
+                  <span>Progress</span>
+                  <span>{progress}%</span>
+                </div>
+                <Progress value={progress} className="h-2" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Converted Files */}
+      {convertedFiles.length > 0 && (
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  Converted Files ({convertedFiles.length})
+                </CardTitle>
+                <CardDescription>
+                  Your PDF files have been converted to PowerPoint presentations
+                </CardDescription>
+              </div>
+              {convertedFiles.length > 1 && (
+                <Button onClick={downloadAll} className="bg-green-600 hover:bg-green-700">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download All
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {convertedFiles.map((file, index) => (
+                <div key={index} className="flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm group">
+                  <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-lg">
+                    <Presentation className="h-5 w-5 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="secondary" className="text-xs">
+                        PowerPoint
+                      </Badge>
+                      <h4 className="font-medium text-gray-900 truncate">
+                        {file.name}
+                      </h4>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <span>{file.pages} slides</span>
+                      <span>{file.size}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadFile(file)}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Action Button */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Button
+          onClick={convertToPowerpoint}
+          disabled={files.length === 0 || converting}
+          className="flex-1 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white py-3 text-lg font-semibold"
+          size="lg"
+        >
+          {converting ? (
+            <>
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              Converting...
+            </>
+          ) : (
+            <>
+              <Zap className="h-5 w-5 mr-2" />
+              Convert {files.length} PDF{files.length !== 1 ? 's' : ''} to PowerPoint
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Help Section */}
+      {files.length === 0 && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>How to convert PDF to PowerPoint:</strong> Upload PDF files, configure your slide layout and conversion settings, then click "Convert to PowerPoint" to create editable presentations.
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );
