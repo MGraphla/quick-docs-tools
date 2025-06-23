@@ -113,6 +113,7 @@ const PdfToPowerpointPage = () => {
     setConverting(true);
     setProgress(0);
     setProgressMessage("Preparing conversion...");
+    setConvertedFiles([]);
 
     try {
       const converted: ConvertedFile[] = [];

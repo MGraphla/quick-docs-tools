@@ -120,6 +120,7 @@ const CompressPdfPage = () => {
     setCompressing(true);
     setProgress(0);
     setProgressMessage("Preparing compression...");
+    setCompressedFiles([]);
 
     try {
       const compressed: CompressedFile[] = [];
@@ -154,7 +155,9 @@ const CompressPdfPage = () => {
         const compressedSize = compressedBytes.length;
         const compressionRatio = Math.round(((originalSize - compressedSize) / originalSize) * 100);
         
-        const url = pdfProcessor.createDownloadLink(compressedBytes, file.file.name.replace('.pdf', '_compressed.pdf'));
+        // Create a blob URL for the compressed PDF
+        const blob = new Blob([compressedBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
         
         compressed.push({
           name: file.file.name.replace('.pdf', '_compressed.pdf'),
