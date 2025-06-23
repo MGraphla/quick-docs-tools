@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +32,14 @@ import {
   Send,
   Clock,
   Globe,
-  Zap
+  Zap,
+  Sparkles,
+  FileSpreadsheet,
+  Presentation,
+  Minimize2,
+  RotateCw,
+  Type,
+  Highlighter
 } from "lucide-react";
 import AuthModal from "@/components/auth/AuthModal";
 import { toast } from "sonner";
@@ -47,7 +54,31 @@ const Index = () => {
     subject: '',
     message: ''
   });
+  const [currentToolIndex, setCurrentToolIndex] = useState(0);
   const navigate = useNavigate();
+
+  const allTools = [
+    { name: "Merge PDF", icon: FileText, color: "text-blue-500" },
+    { name: "Split PDF", icon: Scissors, color: "text-green-500" },
+    { name: "Compress PDF", icon: Minimize2, color: "text-purple-500" },
+    { name: "PDF to Word", icon: FileDown, color: "text-orange-500" },
+    { name: "PDF to PowerPoint", icon: Presentation, color: "text-red-500" },
+    { name: "PDF to Excel", icon: FileSpreadsheet, color: "text-emerald-500" },
+    { name: "Word to PDF", icon: FileUp, color: "text-blue-600" },
+    { name: "PowerPoint to PDF", icon: FileUp, color: "text-pink-500" },
+    { name: "Excel to PDF", icon: FileUp, color: "text-teal-500" },
+    { name: "Edit PDF", icon: Edit, color: "text-indigo-500" },
+    { name: "PDF to JPG", icon: Image, color: "text-yellow-500" },
+    { name: "JPG to PDF", icon: FileUp, color: "text-cyan-500" },
+    { name: "Sign PDF", icon: Signature, color: "text-violet-500" },
+    { name: "Watermark PDF", icon: Shield, color: "text-rose-500" },
+    { name: "Rotate PDF", icon: RotateCw, color: "text-amber-500" },
+    { name: "Protect PDF", icon: Shield, color: "text-slate-500" },
+    { name: "QR Generator", icon: QrCode, color: "text-lime-500" },
+    { name: "Link Shortener", icon: LinkIcon, color: "text-sky-500" },
+    { name: "Audio to Text", icon: Mic, color: "text-fuchsia-500" },
+    { name: "Live Transcription", icon: Mic, color: "text-emerald-600" },
+  ];
 
   const pdfTools = [
     { name: "Merge PDF", description: "Combine multiple PDF files into one", icon: FileText },
@@ -110,6 +141,14 @@ const Index = () => {
     }
   ];
 
+  // Animated tool cycling
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentToolIndex((prev) => (prev + 1) % allTools.length);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
   const openAuthModal = (mode: 'signin' | 'signup') => {
     setAuthMode(mode);
     setAuthModalOpen(true);
@@ -139,12 +178,41 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden">
-      {/* Animated Background Elements */}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden relative">
+      {/* Enhanced Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full opacity-10 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-400 rounded-full opacity-10 animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full opacity-5 animate-spin" style={{ animationDuration: '20s' }}></div>
+        {/* Floating geometric shapes */}
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full opacity-20 animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full opacity-20 animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full opacity-10 animate-spin" style={{ animationDuration: '20s' }}></div>
+        
+        {/* Floating icons */}
+        <div className="absolute top-20 left-20 animate-bounce" style={{ animationDelay: '0s', animationDuration: '3s' }}>
+          <FileText className="h-8 w-8 text-blue-300 opacity-60" />
+        </div>
+        <div className="absolute top-40 right-32 animate-bounce" style={{ animationDelay: '1s', animationDuration: '3s' }}>
+          <Scissors className="h-6 w-6 text-green-300 opacity-60" />
+        </div>
+        <div className="absolute bottom-40 left-32 animate-bounce" style={{ animationDelay: '2s', animationDuration: '3s' }}>
+          <QrCode className="h-7 w-7 text-purple-300 opacity-60" />
+        </div>
+        <div className="absolute top-60 right-20 animate-bounce" style={{ animationDelay: '0.5s', animationDuration: '3s' }}>
+          <Edit className="h-5 w-5 text-orange-300 opacity-60" />
+        </div>
+        
+        {/* Animated particles */}
+        {[...Array(20)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full opacity-30 animate-ping"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 5}s`,
+              animationDuration: `${2 + Math.random() * 3}s`
+            }}
+          />
+        ))}
       </div>
 
       {/* Modern Header */}
@@ -154,8 +222,8 @@ const Index = () => {
             {/* Logo */}
             <div className="flex items-center space-x-2 hover-scale cursor-pointer" onClick={() => scrollToSection('home')}>
               <div className="relative">
-                <FileText className="h-8 w-8 text-blue-600" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <FileText className="h-8 w-8 text-blue-600 animate-pulse" />
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-ping"></div>
               </div>
               <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 QuickDocs
@@ -204,72 +272,114 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section id="home" className="container mx-auto px-4 py-16 relative z-10">
-        <div className="text-center max-w-5xl mx-auto animate-fade-in">
-          <div className="inline-flex items-center bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-6 animate-bounce">
-            <Star className="h-4 w-4 mr-2" />
+      {/* Enhanced Hero Section */}
+      <section id="home" className="container mx-auto px-4 py-20 relative z-10">
+        <div className="text-center max-w-6xl mx-auto animate-fade-in">
+          <div className="inline-flex items-center bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 px-6 py-3 rounded-full text-sm font-medium mb-8 animate-bounce shadow-lg">
+            <Star className="h-4 w-4 mr-2 animate-spin" style={{ animationDuration: '3s' }} />
             Trusted by 50,000+ users worldwide
+            <Sparkles className="h-4 w-4 ml-2 animate-pulse" />
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+          <h1 className="text-6xl md:text-8xl font-bold text-gray-900 mb-8 leading-tight">
             Complete 
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 animate-pulse"> PDF</span> & 
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600"> Productivity</span> 
-            <span className="inline-block animate-bounce ml-2">⚡</span>
+            <span className="inline-block animate-bounce ml-2 text-6xl">⚡</span>
           </h1>
           
-          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-4xl mx-auto leading-relaxed">
             Transform, edit, and manage your documents with our comprehensive suite of 
             <span className="font-semibold text-blue-600"> 25+ professional tools</span>. 
             Everything you need for document productivity, all in one place.
           </p>
+
+          {/* Animated Tool Display */}
+          <div className="mb-12 p-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 max-w-2xl mx-auto">
+            <div className="flex items-center justify-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div className={`p-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg transform transition-all duration-500 ${currentToolIndex % 2 === 0 ? 'scale-110' : 'scale-100'}`}>
+                  {React.createElement(allTools[currentToolIndex].icon, {
+                    className: "h-6 w-6 text-white"
+                  })}
+                </div>
+                <div className="text-left">
+                  <p className="text-sm text-gray-500 font-medium">Currently featuring:</p>
+                  <p className={`text-xl font-bold transition-all duration-500 ${allTools[currentToolIndex].color}`}>
+                    {allTools[currentToolIndex].name}
+                  </p>
+                </div>
+              </div>
+              <div className="flex space-x-1">
+                {allTools.slice(0, 5).map((_, index) => (
+                  <div
+                    key={index}
+                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                      index === currentToolIndex % 5 ? 'bg-blue-500 scale-125' : 'bg-gray-300'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
           
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-12">
             <Button 
               size="lg" 
               onClick={() => openAuthModal('signup')} 
-              className="text-lg px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover-scale shadow-xl hover:shadow-2xl transition-all duration-300"
+              className="text-xl px-10 py-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover-scale shadow-2xl hover:shadow-3xl transition-all duration-300 rounded-2xl"
             >
+              <Zap className="mr-3 h-6 w-6 animate-pulse" />
               Start Free Now
-              <ArrowRight className="ml-2 h-5 w-5" />
+              <ArrowRight className="ml-3 h-6 w-6 animate-bounce" style={{ animationDirection: 'alternate' }} />
             </Button>
             <Button 
               variant="outline" 
               size="lg" 
               onClick={() => scrollToSection('tools')}
-              className="text-lg px-8 py-4 hover-scale border-2 hover:border-blue-300 transition-all duration-300"
+              className="text-xl px-10 py-6 hover-scale border-2 hover:border-blue-300 transition-all duration-300 rounded-2xl bg-white/80 backdrop-blur-sm"
             >
+              <FileText className="mr-3 h-6 w-6" />
               View All Tools
             </Button>
           </div>
 
-          {/* Feature Pills */}
-          <div className="flex flex-wrap justify-center gap-4 mb-12">
+          {/* Enhanced Feature Pills */}
+          <div className="flex flex-wrap justify-center gap-6 mb-16">
             {features.map((feature, index) => (
               <div 
                 key={feature}
-                className="flex items-center bg-white/80 backdrop-blur-sm border border-gray-200 rounded-full px-4 py-2 shadow-sm hover:shadow-md transition-all duration-300 hover-scale"
+                className="flex items-center bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover-scale group"
                 style={{ animationDelay: `${0.5 + index * 0.1}s` }}
               >
-                <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                <CheckCircle className="h-5 w-5 text-green-500 mr-3 group-hover:animate-spin" />
                 <span className="text-sm font-medium text-gray-700">{feature}</span>
               </div>
             ))}
           </div>
 
-          {/* Stats Section */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-16">
+          {/* Enhanced Stats Section */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20">
             {stats.map((stat, index) => (
-              <div key={index} className="text-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mb-3">
-                  <stat.icon className="h-6 w-6 text-white" />
+              <div key={index} className="text-center group hover-scale">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110">
+                  <stat.icon className="h-8 w-8 text-white group-hover:animate-pulse" />
                 </div>
-                <div className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">{stat.number}</div>
-                <div className="text-sm text-gray-600">{stat.label}</div>
+                <div className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors duration-300">{stat.number}</div>
+                <div className="text-sm text-gray-600 font-medium">{stat.label}</div>
               </div>
             ))}
+          </div>
+
+          {/* Floating Action Buttons */}
+          <div className="fixed bottom-8 right-8 z-40 flex flex-col space-y-4">
+            <Button
+              onClick={() => openAuthModal('signup')}
+              className="w-14 h-14 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-2xl hover:shadow-3xl transition-all duration-300 animate-pulse"
+            >
+              <Zap className="h-6 w-6" />
+            </Button>
           </div>
         </div>
       </section>
@@ -277,7 +387,10 @@ const Index = () => {
       {/* Tools Section */}
       <section id="tools" className="container mx-auto px-4 py-16 relative z-10">
         <div className="text-center mb-12 animate-fade-in">
-          <Badge variant="secondary" className="mb-4 text-lg px-6 py-2 animate-bounce">25+ Tools Available</Badge>
+          <Badge variant="secondary" className="mb-4 text-lg px-6 py-2 animate-bounce bg-gradient-to-r from-blue-100 to-purple-100">
+            <Sparkles className="h-4 w-4 mr-2 animate-spin" />
+            25+ Tools Available
+          </Badge>
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
             Everything You Need for 
             <span className="text-blue-600"> PDF Management</span>
@@ -294,19 +407,20 @@ const Index = () => {
             {pdfTools.map((tool, index) => (
               <Card 
                 key={index} 
-                className="hover:shadow-xl transition-all duration-300 cursor-pointer hover-scale border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white group"
+                className="hover:shadow-2xl transition-all duration-500 cursor-pointer hover-scale border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white group relative overflow-hidden"
                 onClick={handleToolClick}
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
-                <CardHeader className="pb-3">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <CardHeader className="pb-3 relative z-10">
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 rounded-lg bg-blue-50 group-hover:bg-blue-100 transition-colors duration-300">
-                      <tool.icon className="h-6 w-6 text-blue-600 group-hover:scale-110 transition-transform duration-300" />
+                    <div className="p-3 rounded-xl bg-blue-50 group-hover:bg-blue-100 transition-colors duration-300 group-hover:scale-110 transform">
+                      <tool.icon className="h-6 w-6 text-blue-600 group-hover:animate-pulse" />
                     </div>
                     <CardTitle className="text-lg group-hover:text-blue-600 transition-colors duration-300">{tool.name}</CardTitle>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="relative z-10">
                   <CardDescription className="group-hover:text-gray-700 transition-colors duration-300">{tool.description}</CardDescription>
                 </CardContent>
               </Card>
@@ -321,19 +435,20 @@ const Index = () => {
             {additionalTools.map((tool, index) => (
               <Card 
                 key={index} 
-                className="hover:shadow-xl transition-all duration-300 cursor-pointer hover-scale border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white group"
+                className="hover:shadow-2xl transition-all duration-500 cursor-pointer hover-scale border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white group relative overflow-hidden"
                 onClick={handleToolClick}
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
-                <CardHeader className="pb-3">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <CardHeader className="pb-3 relative z-10">
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 rounded-lg bg-purple-50 group-hover:bg-purple-100 transition-colors duration-300">
-                      <tool.icon className="h-6 w-6 text-purple-600 group-hover:scale-110 transition-transform duration-300" />
+                    <div className="p-3 rounded-xl bg-purple-50 group-hover:bg-purple-100 transition-colors duration-300 group-hover:scale-110 transform">
+                      <tool.icon className="h-6 w-6 text-purple-600 group-hover:animate-pulse" />
                     </div>
                     <CardTitle className="text-lg group-hover:text-purple-600 transition-colors duration-300">{tool.name}</CardTitle>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="relative z-10">
                   <CardDescription className="group-hover:text-gray-700 transition-colors duration-300">{tool.description}</CardDescription>
                 </CardContent>
               </Card>
@@ -588,11 +703,26 @@ const Index = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* Enhanced CTA Section */}
       <section className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white py-20 relative overflow-hidden">
         <div className="absolute inset-0 bg-black/20"></div>
+        {/* Animated background elements */}
+        <div className="absolute top-0 left-0 w-full h-full">
+          {[...Array(10)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-4 h-4 bg-white/20 rounded-full animate-ping"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 3}s`,
+                animationDuration: `${2 + Math.random() * 2}s`
+              }}
+            />
+          ))}
+        </div>
         <div className="container mx-auto px-4 text-center relative z-10">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 animate-fade-in">
+          <h2 className="text-4xl md:text-6xl font-bold mb-6 animate-fade-in">
             Ready to Transform Your Workflow?
           </h2>
           <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.2s' }}>
@@ -602,11 +732,12 @@ const Index = () => {
             size="lg" 
             variant="secondary" 
             onClick={() => openAuthModal('signup')}
-            className="text-lg px-8 py-4 hover-scale bg-white text-gray-900 hover:bg-gray-100 shadow-xl hover:shadow-2xl transition-all duration-300 animate-fade-in"
+            className="text-xl px-10 py-6 hover-scale bg-white text-gray-900 hover:bg-gray-100 shadow-2xl hover:shadow-3xl transition-all duration-300 animate-fade-in rounded-2xl"
             style={{ animationDelay: '0.4s' }}
           >
+            <Sparkles className="mr-3 h-6 w-6 animate-spin" />
             Get Started for Free
-            <ArrowRight className="ml-2 h-5 w-5" />
+            <ArrowRight className="ml-3 h-6 w-6 animate-bounce" />
           </Button>
         </div>
       </section>
