@@ -100,12 +100,12 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden relative">
-      {/* Ultra Dynamic Background */}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden relative">
+      {/* Enhanced Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Mouse-responsive gradient orbs */}
         <div 
-          className="absolute w-96 h-96 bg-gradient-to-r from-blue-500/30 to-purple-600/30 rounded-full blur-3xl transition-all duration-1000 ease-out"
+          className="absolute w-96 h-96 bg-gradient-to-r from-blue-500/10 to-purple-600/10 rounded-full blur-3xl transition-all duration-1000 ease-out"
           style={{
             left: mousePosition.x - 192,
             top: mousePosition.y - 192,
@@ -113,7 +113,7 @@ const Index = () => {
           }}
         />
         <div 
-          className="absolute w-80 h-80 bg-gradient-to-r from-pink-500/20 to-rose-600/20 rounded-full blur-3xl transition-all duration-1500 ease-out"
+          className="absolute w-80 h-80 bg-gradient-to-r from-pink-500/5 to-rose-600/5 rounded-full blur-3xl transition-all duration-1500 ease-out"
           style={{
             left: mousePosition.x - 160,
             top: mousePosition.y - 160,
@@ -122,12 +122,12 @@ const Index = () => {
         />
 
         {/* Floating particles */}
-        {Array.from({ length: 30 }).map((_, i) => (
+        {Array.from({ length: 20 }).map((_, i) => (
           <div
             key={i}
             className={`absolute w-2 h-2 bg-gradient-to-r ${
               ['from-blue-400 to-cyan-400', 'from-purple-400 to-pink-400', 'from-green-400 to-emerald-400', 'from-orange-400 to-amber-400'][i % 4]
-            } rounded-full opacity-60 animate-float`}
+            } rounded-full opacity-30 animate-float`}
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -138,10 +138,10 @@ const Index = () => {
         ))}
 
         {/* Magical sparkles */}
-        {Array.from({ length: 15 }).map((_, i) => (
+        {Array.from({ length: 10 }).map((_, i) => (
           <div
             key={`sparkle-${i}`}
-            className="absolute text-yellow-300 opacity-70 animate-twinkle"
+            className="absolute text-blue-400 opacity-40 animate-twinkle"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -154,13 +154,13 @@ const Index = () => {
         ))}
 
         {/* Geometric shapes */}
-        <div className="absolute top-20 left-20 w-32 h-32 border border-blue-400/20 rounded-full animate-spin" style={{ animationDuration: '20s' }} />
-        <div className="absolute bottom-20 right-20 w-24 h-24 border border-purple-400/20 rotate-45 animate-pulse" />
-        <div className="absolute top-1/2 left-10 w-16 h-16 bg-gradient-to-r from-pink-400/10 to-rose-400/10 rounded-lg animate-bounce" style={{ animationDuration: '3s' }} />
+        <div className="absolute top-20 left-20 w-32 h-32 border border-blue-200 rounded-full animate-spin" style={{ animationDuration: '20s' }} />
+        <div className="absolute bottom-20 right-20 w-24 h-24 border border-purple-200 rotate-45 animate-pulse" />
+        <div className="absolute top-1/2 left-10 w-16 h-16 bg-gradient-to-r from-pink-100 to-rose-100 rounded-lg animate-bounce" style={{ animationDuration: '3s' }} />
       </div>
 
-      {/* Premium Header */}
-      <header className="sticky top-0 z-50 bg-black/20 backdrop-blur-xl border-b border-white/10 shadow-2xl">
+      {/* Modern Header */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200/50 shadow-sm">
         <div className="container mx-auto px-4 py-3 sm:py-4">
           <nav className="flex items-center justify-between">
             {/* Enhanced Logo */}
@@ -173,10 +173,10 @@ const Index = () => {
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-lg" />
               </div>
               <div>
-                <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-gradient-x">
+                <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent animate-gradient-x">
                   QuickDocs
                 </span>
-                <p className="text-xs text-gray-400 font-medium hidden sm:block">Document Tools</p>
+                <p className="text-xs text-gray-500 font-medium hidden sm:block">Document Tools</p>
               </div>
             </div>
 
@@ -185,7 +185,7 @@ const Index = () => {
               <Button 
                 variant="ghost" 
                 onClick={() => openAuthModal('signin')}
-                className="text-xs sm:text-sm hover:bg-white/10 text-white hover:text-white transition-all duration-300 hover:scale-105 px-3 py-2 sm:px-4"
+                className="text-xs sm:text-sm hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-all duration-300 hover:scale-105 px-3 py-2 sm:px-4"
               >
                 Sign In
               </Button>
@@ -204,26 +204,26 @@ const Index = () => {
       <section className="container mx-auto px-4 py-8 sm:py-16 relative z-10">
         <div className="text-center max-w-6xl mx-auto">
           {/* Magical Badge */}
-          <div className="inline-flex items-center bg-gradient-to-r from-blue-500/20 to-purple-600/20 backdrop-blur-sm border border-white/20 text-white px-3 py-2 sm:px-4 rounded-full text-xs sm:text-sm font-medium mb-4 sm:mb-6 animate-float shadow-2xl">
-            <Crown className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-yellow-400" />
+          <div className="inline-flex items-center bg-blue-100 border border-blue-200 text-blue-800 px-3 py-2 sm:px-4 rounded-full text-xs sm:text-sm font-medium mb-4 sm:mb-6 animate-float shadow-lg">
+            <Crown className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-blue-600" />
             Trusted by 50,000+ users worldwide
-            <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 ml-2 text-yellow-400 animate-twinkle" />
+            <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 ml-2 text-blue-600 animate-twinkle" />
           </div>
           
           {/* Ultra-Dynamic Title */}
           <div className="relative mb-4 sm:mb-6">
-            <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl font-bold text-white leading-tight">
+            <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl font-bold text-gray-900 leading-tight">
               <span className="inline-block animate-float" style={{ animationDelay: '0s' }}>
                 Complete
               </span>{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 animate-gradient-x inline-block animate-float" style={{ animationDelay: '0.2s' }}>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 animate-gradient-x inline-block animate-float" style={{ animationDelay: '0.2s' }}>
                 PDF
               </span>{' '}
               <span className="inline-block animate-float" style={{ animationDelay: '0.4s' }}>
                 &
               </span>
               <br className="hidden sm:block" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-rose-400 animate-gradient-x inline-block animate-float" style={{ animationDelay: '0.6s' }}>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 animate-gradient-x inline-block animate-float" style={{ animationDelay: '0.6s' }}>
                 Document
               </span>{' '}
               <span className="inline-block animate-float" style={{ animationDelay: '0.8s' }}>
@@ -233,14 +233,14 @@ const Index = () => {
             </h1>
             
             {/* Magical icons around title */}
-            <Crown className="absolute -top-4 -left-4 sm:-top-8 sm:-left-8 h-6 w-6 sm:h-8 sm:w-8 text-yellow-400 animate-twinkle" />
-            <Wand2 className="absolute -top-4 -right-4 sm:-top-8 sm:-right-8 h-6 w-6 sm:h-8 sm:w-8 text-purple-400 animate-float" />
-            <Sparkles className="absolute -bottom-4 left-1/4 h-5 w-5 sm:h-6 sm:w-6 text-pink-400 animate-twinkle" style={{ animationDelay: '1s' }} />
+            <Crown className="absolute -top-4 -left-4 sm:-top-8 sm:-left-8 h-6 w-6 sm:h-8 sm:w-8 text-yellow-500 animate-twinkle" />
+            <Wand2 className="absolute -top-4 -right-4 sm:-top-8 sm:-right-8 h-6 w-6 sm:h-8 sm:w-8 text-purple-500 animate-float" />
+            <Sparkles className="absolute -bottom-4 left-1/4 h-5 w-5 sm:h-6 sm:w-6 text-pink-500 animate-twinkle" style={{ animationDelay: '1s' }} />
           </div>
           
-          <p className="text-lg sm:text-xl md:text-2xl text-gray-300 mb-6 sm:mb-8 max-w-4xl mx-auto leading-relaxed px-4">
+          <p className="text-lg sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-4xl mx-auto leading-relaxed px-4">
             Transform, edit, and manage your documents with our comprehensive suite of 
-            <span className="font-semibold text-blue-400"> 16+ professional tools</span>. 
+            <span className="font-semibold text-blue-600"> 16+ professional tools</span>. 
             Everything you need for document productivity, all in one place.
           </p>
           
@@ -259,7 +259,7 @@ const Index = () => {
               variant="outline" 
               size="lg" 
               onClick={() => document.getElementById('tools')?.scrollIntoView({ behavior: 'smooth' })}
-              className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 border-2 border-white/30 text-white hover:bg-white/10 hover:scale-105 transition-all duration-300 backdrop-blur-sm"
+              className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:scale-105 transition-all duration-300"
             >
               View All Tools
             </Button>
@@ -270,12 +270,12 @@ const Index = () => {
             {features.map((feature, index) => (
               <div 
                 key={feature.text}
-                className="flex items-center bg-black/30 backdrop-blur-sm border border-white/20 rounded-full px-3 py-2 sm:px-4 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 hover:bg-black/40 group"
+                className="flex items-center bg-white/80 backdrop-blur-sm border border-gray-200 rounded-full px-3 py-2 sm:px-4 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 hover:bg-white group"
                 style={{ animationDelay: `${0.5 + index * 0.1}s` }}
               >
-                <feature.icon className="h-3 w-3 sm:h-4 sm:w-4 text-green-400 mr-2 group-hover:scale-110 transition-transform" />
-                <span className="text-xs sm:text-sm font-medium text-white">{feature.text}</span>
-                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 ml-2 text-yellow-400 opacity-0 group-hover:opacity-100 animate-twinkle transition-opacity" />
+                <feature.icon className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 mr-2 group-hover:scale-110 transition-transform" />
+                <span className="text-xs sm:text-sm font-medium text-gray-700">{feature.text}</span>
+                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 ml-2 text-yellow-500 opacity-0 group-hover:opacity-100 animate-twinkle transition-opacity" />
               </div>
             ))}
           </div>
@@ -283,12 +283,12 @@ const Index = () => {
           {/* Enhanced Stats Section */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mt-8 sm:mt-16 px-4">
             {stats.map((stat, index) => (
-              <div key={index} className="text-center group hover:scale-125 transition-all duration-500">
+              <div key={index} className="text-center group hover:scale-110 transition-all duration-500">
                 <div className={`inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r ${stat.gradient} rounded-full mb-2 sm:mb-3 shadow-lg group-hover:shadow-xl group-hover:shadow-current/25`}>
                   <stat.icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                 </div>
-                <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1 group-hover:bg-gradient-to-r group-hover:from-blue-400 group-hover:to-purple-400 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">{stat.number}</div>
-                <div className="text-xs sm:text-sm text-gray-400">{stat.label}</div>
+                <div className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-1 group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300">{stat.number}</div>
+                <div className="text-xs sm:text-sm text-gray-600">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -298,14 +298,14 @@ const Index = () => {
       {/* Ultra-Enhanced PDF Tools Section */}
       <section id="tools" className="container mx-auto px-4 py-8 sm:py-16 relative z-10">
         <div className="text-center mb-8 sm:mb-12">
-          <Badge variant="secondary" className="mb-3 sm:mb-4 text-sm sm:text-lg px-4 sm:px-6 py-2 bg-gradient-to-r from-blue-500/20 to-purple-600/20 text-white border-white/20 animate-float shadow-xl">
+          <Badge variant="secondary" className="mb-3 sm:mb-4 text-sm sm:text-lg px-4 sm:px-6 py-2 bg-blue-100 text-blue-800 border-blue-200 animate-float shadow-lg">
             16+ Tools Available
           </Badge>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-3 sm:mb-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-3 sm:mb-4">
             Everything You Need for 
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 animate-gradient-x"> PDF Management</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 animate-gradient-x"> PDF Management</span>
           </h2>
-          <p className="text-lg sm:text-xl text-gray-300 max-w-3xl mx-auto px-4">
+          <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto px-4">
             From basic conversions to advanced editing, our tools handle all your document needs
           </p>
         </div>
@@ -320,7 +320,7 @@ const Index = () => {
                   className={`flex-shrink-0 p-2 sm:p-3 rounded-lg transition-all duration-500 cursor-pointer ${
                     index === currentToolIndex 
                       ? `bg-gradient-to-r ${tool.gradient} shadow-2xl scale-110` 
-                      : 'bg-white/10 hover:bg-white/20'
+                      : 'bg-gray-100 hover:bg-gray-200'
                   }`}
                   onClick={() => setCurrentToolIndex(index)}
                 >
@@ -331,10 +331,10 @@ const Index = () => {
           </div>
           
           <div className="text-center">
-            <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
               {pdfTools[currentToolIndex]?.name}
             </h3>
-            <p className="text-gray-300 text-sm sm:text-base px-4">
+            <p className="text-gray-600 text-sm sm:text-base px-4">
               {pdfTools[currentToolIndex]?.description}
             </p>
           </div>
@@ -345,16 +345,16 @@ const Index = () => {
           {pdfTools.map((tool, index) => (
             <Card 
               key={index} 
-              className="group hover:shadow-2xl transition-all duration-500 cursor-pointer border-0 bg-black/30 backdrop-blur-sm border border-white/10 hover:bg-black/40 hover:scale-105 hover:border-white/30 relative overflow-hidden"
+              className="group hover:shadow-2xl transition-all duration-500 cursor-pointer border-0 bg-white/80 backdrop-blur-sm shadow-lg hover:bg-white hover:scale-105 relative overflow-hidden"
               onClick={handleToolClick}
               style={{ animationDelay: `${index * 0.05}s` }}
             >
               {/* Gradient overlay on hover */}
-              <div className={`absolute inset-0 bg-gradient-to-r ${tool.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-500`} />
+              <div className={`absolute inset-0 bg-gradient-to-r ${tool.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`} />
               
               {/* Magical sparkle indicator */}
               <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-400 animate-twinkle" />
+                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 animate-twinkle" />
               </div>
 
               <CardHeader className="pb-2 sm:pb-3">
@@ -362,13 +362,13 @@ const Index = () => {
                   <div className={`p-2 rounded-lg bg-gradient-to-r ${tool.gradient} group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
                     <tool.icon className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" />
                   </div>
-                  <CardTitle className="text-sm sm:text-base lg:text-lg text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-400 group-hover:to-purple-400 transition-all duration-300">
+                  <CardTitle className="text-sm sm:text-base lg:text-lg text-gray-900 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
                     {tool.name}
                   </CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
-                <CardDescription className="text-gray-400 group-hover:text-gray-300 transition-colors duration-300 text-xs sm:text-sm">
+                <CardDescription className="text-gray-600 group-hover:text-gray-700 transition-colors duration-300 text-xs sm:text-sm">
                   {tool.description}
                 </CardDescription>
               </CardContent>
@@ -378,9 +378,9 @@ const Index = () => {
       </section>
 
       {/* Ultra-Enhanced CTA Section */}
-      <section className="bg-gradient-to-r from-blue-900/50 via-purple-900/50 to-pink-900/50 backdrop-blur-sm py-12 sm:py-20 relative overflow-hidden border-t border-white/10">
+      <section className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 py-12 sm:py-20 relative overflow-hidden">
         {/* Floating magical elements */}
-        {Array.from({ length: 20 }).map((_, i) => (
+        {Array.from({ length: 15 }).map((_, i) => (
           <div
             key={`cta-magic-${i}`}
             className="absolute text-white/20 animate-float"
@@ -400,7 +400,7 @@ const Index = () => {
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-3 sm:mb-4 text-white">
             Ready to Transform Your Workflow?
           </h2>
-          <p className="text-lg sm:text-xl mb-6 sm:mb-8 text-gray-300 max-w-3xl mx-auto px-4">
+          <p className="text-lg sm:text-xl mb-6 sm:mb-8 text-blue-100 max-w-3xl mx-auto px-4">
             Join thousands of professionals who trust QuickDocs for their document processing needs
           </p>
           <Button 
@@ -417,7 +417,7 @@ const Index = () => {
       </section>
 
       {/* Enhanced Footer */}
-      <footer className="bg-black/50 backdrop-blur-sm text-white py-8 sm:py-12 border-t border-white/10">
+      <footer className="bg-gray-900 text-white py-8 sm:py-12">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             <div className="col-span-1 sm:col-span-2 lg:col-span-1">
@@ -462,7 +462,7 @@ const Index = () => {
             </div>
           </div>
           
-          <div className="border-t border-white/10 mt-6 sm:mt-8 pt-6 sm:pt-8 text-center text-xs sm:text-sm text-gray-400">
+          <div className="border-t border-gray-800 mt-6 sm:mt-8 pt-6 sm:pt-8 text-center text-xs sm:text-sm text-gray-400">
             <p>&copy; 2024 QuickDocs. All rights reserved. Made with ❤️ for document productivity.</p>
           </div>
         </div>
