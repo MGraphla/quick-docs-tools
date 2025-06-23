@@ -4,7 +4,11 @@ import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardContent } from "@/components/dashboard/DashboardContent";
 
-const Dashboard = () => {
+interface DashboardProps {
+  children?: React.ReactNode;
+}
+
+const Dashboard = ({ children }: DashboardProps) => {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
@@ -12,7 +16,7 @@ const Dashboard = () => {
         <div className="flex-1 flex flex-col">
           <DashboardHeader />
           <main className="flex-1 p-6">
-            <DashboardContent />
+            {children || <DashboardContent />}
           </main>
         </div>
       </div>

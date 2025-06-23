@@ -1,11 +1,11 @@
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mail, Lock, User } from "lucide-react";
 
 interface AuthModalProps {
@@ -13,24 +13,49 @@ interface AuthModalProps {
   onOpenChange: (open: boolean) => void;
   mode: 'signin' | 'signup';
   onModeChange: (mode: 'signin' | 'signup') => void;
+  onSuccess?: () => void;
 }
 
-const AuthModal = ({ open, onOpenChange, mode, onModeChange }: AuthModalProps) => {
+const AuthModal = ({ open, onOpenChange, mode, onModeChange, onSuccess }: AuthModalProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    // Simulate authentication process
+    // Demo authentication - for testing purposes
+    // In a real app, you'd validate against actual credentials
+    const demoCredentials = {
+      email: "demo@quickdocs.com",
+      password: "demo123"
+    };
+
     setTimeout(() => {
       setLoading(false);
-      onOpenChange(false);
-      // In a real app, you'd navigate to dashboard here
-      console.log("Authentication successful");
+      
+      // Simple demo authentication check
+      if (mode === 'signin') {
+        if (email === demoCredentials.email && password === demoCredentials.password) {
+          console.log("Authentication successful");
+          onOpenChange(false);
+          navigate('/dashboard');
+        } else {
+          alert("Demo credentials:\nEmail: demo@quickdocs.com\nPassword: demo123");
+        }
+      } else {
+        // For signup, just redirect to dashboard
+        console.log("Account created successfully");
+        onOpenChange(false);
+        navigate('/dashboard');
+      }
+      
+      if (onSuccess) {
+        onSuccess();
+      }
     }, 1500);
   };
 
@@ -40,7 +65,11 @@ const AuthModal = ({ open, onOpenChange, mode, onModeChange }: AuthModalProps) =
     setTimeout(() => {
       setLoading(false);
       onOpenChange(false);
+      navigate('/dashboard');
       console.log("Google authentication successful");
+      if (onSuccess) {
+        onSuccess();
+      }
     }, 1000);
   };
 
@@ -58,6 +87,16 @@ const AuthModal = ({ open, onOpenChange, mode, onModeChange }: AuthModalProps) =
             }
           </DialogDescription>
         </DialogHeader>
+
+        {mode === 'signin' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-blue-800">
+              <strong>Demo Credentials:</strong><br />
+              Email: demo@quickdocs.com<br />
+              Password: demo123
+            </p>
+          </div>
+        )}
 
         <div className="space-y-4">
           <Button 
