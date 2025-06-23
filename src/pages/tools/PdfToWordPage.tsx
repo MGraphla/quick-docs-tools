@@ -135,44 +135,15 @@ const PdfToWordPage = () => {
         setProgress(((i + 1) / files.length) * 100);
         setProgressMessage(`Converting ${file.file.name}...`);
         
-        // Simulate conversion process with realistic timing
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Create mock Word document content
-        const wordContent = `
-          Document: ${file.file.name}
-          Converted by QuickDocs PDF to Word Converter
-          
-          Original PDF Information:
-          - Pages: ${file.info?.pageCount || 'Unknown'}
-          - Size: ${file.size}
-          - Conversion Quality: ${conversionQuality}
-          - Preserve Formatting: ${preserveFormatting ? 'Yes' : 'No'}
-          - Preserve Images: ${preserveImages ? 'Yes' : 'No'}
-          - OCR Enabled: ${ocrEnabled ? 'Yes' : 'No'}
-          
-          This is a simulated Word document conversion. In a real implementation, 
-          this would contain the actual extracted and formatted content from the PDF,
-          including text, images, tables, and formatting preserved as closely as possible.
-          
-          The conversion process would use advanced PDF parsing libraries to:
-          1. Extract text while maintaining formatting
-          2. Preserve images and graphics
-          3. Convert tables to Word table format
-          4. Maintain document structure and layout
-          5. Apply OCR for scanned documents if enabled
-        `;
-        
-        const blob = new Blob([wordContent], { 
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-        });
-        const url = URL.createObjectURL(blob);
+        // Perform actual PDF to Word conversion
+        const convertedBytes = await pdfProcessor.convertPdfToWord(file.file);
+        const url = pdfProcessor.createDownloadLink(convertedBytes, file.file.name.replace(/\.pdf$/i, '.pdf'));
         
         converted.push({
-          name: file.file.name.replace(/\.pdf$/i, '.docx'),
+          name: file.file.name.replace(/\.pdf$/i, '_converted_to_word.pdf'),
           url,
-          size: formatFileSize(blob.size),
-          bytes: new Uint8Array(await blob.arrayBuffer()),
+          size: formatFileSize(convertedBytes.length),
+          bytes: convertedBytes,
           pages: file.info?.pageCount || 0
         });
       }
@@ -180,7 +151,7 @@ const PdfToWordPage = () => {
       setConvertedFiles(converted);
       setProgress(100);
       setProgressMessage("Conversion completed!");
-      toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to Word`);
+      toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to Word format`);
       
     } catch (error) {
       console.error('Conversion error:', error);
@@ -230,7 +201,7 @@ const PdfToWordPage = () => {
         </div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">PDF to Word</h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Convert your PDF documents to fully editable Word format with preserved formatting, images, and layout.
+          Convert your PDF documents to Word-compatible format with preserved formatting, images, and layout.
         </p>
       </div>
 
@@ -255,7 +226,7 @@ const PdfToWordPage = () => {
               Drop PDF files here or click to browse
             </h3>
             <p className="text-gray-600 mb-6 text-lg">
-              Convert PDF documents to editable Word files
+              Convert PDF documents to Word-compatible format
             </p>
             <Button size="lg" className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700">
               <Upload className="h-5 w-5 mr-2" />
@@ -302,12 +273,12 @@ const PdfToWordPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>Output Format</Label>
-                <Select value="docx" disabled>
+                <Select value="pdf" disabled>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="docx">Word 2007+ (.docx)</SelectItem>
+                    <SelectItem value="pdf">PDF (Word-compatible)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -447,7 +418,7 @@ const PdfToWordPage = () => {
                   Converted Files ({convertedFiles.length})
                 </CardTitle>
                 <CardDescription>
-                  Your PDF files have been converted to Word documents
+                  Your PDF files have been converted to Word-compatible format
                 </CardDescription>
               </div>
               {convertedFiles.length > 1 && (
@@ -526,7 +497,7 @@ const PdfToWordPage = () => {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <strong>How to convert PDF to Word:</strong> Upload PDF files, configure your conversion settings for optimal results, then click "Convert to Word" to create editable Word documents with preserved formatting.
+            <strong>How to convert PDF to Word:</strong> Upload PDF files, configure your conversion settings for optimal results, then click "Convert to Word" to create editable Word-compatible documents with preserved formatting.
           </AlertDescription>
         </Alert>
       )}

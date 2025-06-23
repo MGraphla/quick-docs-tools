@@ -122,7 +122,6 @@ const CompressPdfPage = () => {
 
     try {
       const compressed: CompressedFile[] = [];
-      const reduction = compressionOptions[compressionLevel as keyof typeof compressionOptions].reduction;
       
       const steps = [
         { message: "Analyzing PDF structure...", progress: 15 },
@@ -143,49 +142,26 @@ const CompressPdfPage = () => {
         setProgress(((i + 1) / files.length) * 100);
         setProgressMessage(`Compressing ${file.file.name}...`);
         
-        // Simulate compression process
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Perform actual PDF compression
+        const compressedBytes = await pdfProcessor.compressPdf(file.file, {
+          compressionLevel: compressionLevel as 'low' | 'balanced' | 'high' | 'maximum',
+          imageQuality: imageQuality[0],
+          removeMetadata
+        });
         
-        // Calculate compressed size based on settings
         const originalSize = file.file.size;
-        const baseReduction = reduction;
-        const imageQualityFactor = (100 - imageQuality[0]) / 100 * 0.3;
-        const metadataFactor = removeMetadata ? 0.05 : 0;
-        const totalReduction = Math.min(0.9, baseReduction + imageQualityFactor + metadataFactor);
-        const compressedSize = Math.floor(originalSize * (1 - totalReduction));
+        const compressedSize = compressedBytes.length;
+        const compressionRatio = Math.round(((originalSize - compressedSize) / originalSize) * 100);
         
-        // Create compressed PDF content (simulated)
-        const compressedContent = `Compressed PDF: ${file.file.name}
-Original Size: ${formatFileSize(originalSize)}
-Compressed Size: ${formatFileSize(compressedSize)}
-Compression Level: ${compressionLevel}
-Image Quality: ${imageQuality[0]}%
-Metadata Removed: ${removeMetadata ? 'Yes' : 'No'}
-
-This is a simulated compressed PDF. In a real implementation, this would contain:
-1. Optimized images with reduced quality settings
-2. Compressed content streams
-3. Removed unnecessary metadata and objects
-4. Optimized font subsetting
-5. Streamlined PDF structure
-
-The compression process would use advanced PDF optimization techniques to:
-- Reduce image file sizes while maintaining visual quality
-- Remove duplicate resources and unused objects
-- Optimize content streams and font data
-- Apply lossless compression where possible
-- Maintain document integrity and functionality`;
-        
-        const blob = new Blob([compressedContent], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
+        const url = pdfProcessor.createDownloadLink(compressedBytes, file.file.name.replace('.pdf', '_compressed.pdf'));
         
         compressed.push({
           name: file.file.name.replace('.pdf', '_compressed.pdf'),
           url,
           originalSize,
           compressedSize,
-          compressionRatio: Math.round(((originalSize - compressedSize) / originalSize) * 100),
-          bytes: new Uint8Array(await blob.arrayBuffer())
+          compressionRatio,
+          bytes: compressedBytes
         });
       }
       

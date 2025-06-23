@@ -135,49 +135,15 @@ const PdfToPowerpointPage = () => {
         setProgress(((i + 1) / files.length) * 100);
         setProgressMessage(`Converting ${file.file.name}...`);
         
-        // Simulate conversion process
-        await new Promise(resolve => setTimeout(resolve, 2500));
-        
-        // Create mock PowerPoint content
-        const pptContent = `
-          Presentation: ${file.file.name}
-          Converted by QuickDocs PDF to PowerPoint Converter
-          
-          Original PDF Information:
-          - Pages: ${file.info?.pageCount || 'Unknown'}
-          - Size: ${file.size}
-          - Slide Layout: ${slideLayout}
-          - One Slide Per Page: ${oneSlidePerPage ? 'Yes' : 'No'}
-          - Preserve Images: ${preserveImages ? 'Yes' : 'No'}
-          - Preserve Formatting: ${preserveFormatting ? 'Yes' : 'No'}
-          
-          This is a simulated PowerPoint presentation conversion. In a real implementation,
-          this would contain the actual slides created from the PDF pages, including:
-          
-          1. Each PDF page converted to a presentation slide
-          2. Text content extracted and formatted appropriately
-          3. Images and graphics preserved and positioned correctly
-          4. Slide layouts optimized for presentation format
-          5. Consistent formatting throughout the presentation
-          
-          The conversion process would:
-          - Analyze PDF page layouts
-          - Extract text while maintaining hierarchy
-          - Convert images to slide-appropriate formats
-          - Apply consistent slide templates
-          - Optimize content for presentation viewing
-        `;
-        
-        const blob = new Blob([pptContent], { 
-          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
-        });
-        const url = URL.createObjectURL(blob);
+        // Perform actual PDF to PowerPoint conversion
+        const convertedBytes = await pdfProcessor.convertPdfToPowerpoint(file.file);
+        const url = pdfProcessor.createDownloadLink(convertedBytes, file.file.name.replace(/\.pdf$/i, '.pdf'));
         
         converted.push({
-          name: file.file.name.replace(/\.pdf$/i, '.pptx'),
+          name: file.file.name.replace(/\.pdf$/i, '_converted_to_ppt.pdf'),
           url,
-          size: formatFileSize(blob.size),
-          bytes: new Uint8Array(await blob.arrayBuffer()),
+          size: formatFileSize(convertedBytes.length),
+          bytes: convertedBytes,
           pages: file.info?.pageCount || 0
         });
       }
@@ -185,7 +151,7 @@ const PdfToPowerpointPage = () => {
       setConvertedFiles(converted);
       setProgress(100);
       setProgressMessage("Conversion completed!");
-      toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to PowerPoint`);
+      toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to PowerPoint format`);
       
     } catch (error) {
       console.error('Conversion error:', error);
@@ -235,7 +201,7 @@ const PdfToPowerpointPage = () => {
         </div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">PDF to PowerPoint</h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Transform your PDF documents into editable PowerPoint presentations with preserved layouts and professional slide formatting.
+          Transform your PDF documents into PowerPoint-compatible presentations with preserved layouts and professional slide formatting.
         </p>
       </div>
 
@@ -308,12 +274,12 @@ const PdfToPowerpointPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>Output Format</Label>
-                <Select value="pptx" disabled>
+                <Select value="pdf" disabled>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pptx">PowerPoint 2007+ (.pptx)</SelectItem>
+                    <SelectItem value="pdf">PDF (PowerPoint-compatible)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -453,7 +419,7 @@ const PdfToPowerpointPage = () => {
                   Converted Files ({convertedFiles.length})
                 </CardTitle>
                 <CardDescription>
-                  Your PDF files have been converted to PowerPoint presentations
+                  Your PDF files have been converted to PowerPoint format
                 </CardDescription>
               </div>
               {convertedFiles.length > 1 && (
@@ -532,7 +498,7 @@ const PdfToPowerpointPage = () => {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <strong>How to convert PDF to PowerPoint:</strong> Upload PDF files, configure your slide layout and conversion settings, then click "Convert to PowerPoint" to create editable presentations.
+            <strong>How to convert PDF to PowerPoint:</strong> Upload PDF files, configure your slide layout and conversion settings, then click "Convert to PowerPoint" to create presentation-ready files.
           </AlertDescription>
         </Alert>
       )}

@@ -163,13 +163,18 @@ const PdfToJpgPage = () => {
         }
 
         // Convert each page
-        for (let pageIndex = 0; pageIndex < pagesToConvert.length; pageIndex++) {
-          const pageNumber = pagesToConvert[pageIndex];
+        const imageFiles = await pdfProcessor.convertPdfToImages(file.file, {
+          format: outputFormat as 'jpg' | 'png',
+          quality: quality[0],
+          resolution: parseInt(resolution)
+        });
+        
+        // Create converted image objects
+        for (let i = 0; i < imageFiles.length; i++) {
+          const pageNumber = i + 1;
+          if (!pagesToConvert.includes(pageNumber)) continue;
           
-          setProgress(((fileIndex * pagesToConvert.length + pageIndex + 1) / (files.length * pagesToConvert.length)) * 100);
-          
-          // Simulate page conversion
-          await new Promise(resolve => setTimeout(resolve, 800));
+          const imageBytes = imageFiles[i];
           
           // Calculate image dimensions based on resolution
           const dpi = parseInt(resolution);
@@ -178,34 +183,21 @@ const PdfToJpgPage = () => {
           const width = Math.round((baseWidth * dpi) / 72);
           const height = Math.round((baseHeight * dpi) / 72);
           
-          // Create mock image content
-          const imageContent = `Mock ${outputFormat.toUpperCase()} image data for ${file.file.name}, page ${pageNumber}
-Quality: ${quality[0]}%
-Resolution: ${resolution} DPI
-Dimensions: ${width}x${height}px
-
-This represents a converted PDF page as a ${outputFormat.toUpperCase()} image.
-In a real implementation, this would contain the actual image data
-rendered from the PDF page at the specified quality and resolution.`;
-          
-          const mimeType = outputFormat === 'jpg' ? 'image/jpeg' : 'image/png';
           const extension = outputFormat === 'jpg' ? 'jpg' : 'png';
-          
-          const blob = new Blob([imageContent], { type: mimeType });
-          const url = URL.createObjectURL(blob);
-          
           const fileName = files.length === 1 && pagesToConvert.length === 1
             ? `${file.file.name.replace('.pdf', '')}.${extension}`
             : `${file.file.name.replace('.pdf', '')}_page_${pageNumber}.${extension}`;
           
+          const url = pdfProcessor.createDownloadLink(imageBytes, fileName);
+          
           converted.push({
             name: fileName,
             url,
-            size: formatFileSize(blob.size),
+            size: formatFileSize(imageBytes.length),
             pageNumber,
             width,
             height,
-            bytes: new Uint8Array(await blob.arrayBuffer())
+            bytes: imageBytes
           });
         }
       }

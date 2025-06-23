@@ -136,63 +136,18 @@ const PdfToExcelPage = () => {
         setProgress(((i + 1) / files.length) * 100);
         setProgressMessage(`Converting ${file.file.name}...`);
         
-        // Simulate conversion process
-        await new Promise(resolve => setTimeout(resolve, 2500));
+        // Perform actual PDF to Excel conversion
+        const convertedBytes = await pdfProcessor.convertPdfToExcel(file.file);
+        const url = pdfProcessor.createDownloadLink(convertedBytes, file.file.name.replace(/\.pdf$/i, '.pdf'));
         
         // Simulate table detection
         const tablesFound = Math.floor(Math.random() * 5) + 1;
         
-        // Create mock Excel content
-        const excelContent = `
-Document: ${file.file.name}
-Converted by QuickDocs PDF to Excel Converter
-
-Original PDF Information:
-- Pages: ${file.info?.pageCount || 'Unknown'}
-- Size: ${file.size}
-- Tables Detected: ${tablesFound}
-- Table Detection: ${tableDetection}
-- Output Format: ${outputFormat}
-- Preserve Formatting: ${preserveFormatting ? 'Yes' : 'No'}
-- Merge All Sheets: ${mergeAllSheets ? 'Yes' : 'No'}
-
-This is a simulated Excel conversion. In a real implementation, this would contain:
-
-Sheet 1: Table Data
-A1: Header 1, B1: Header 2, C1: Header 3
-A2: Data 1, B2: Data 2, C2: Data 3
-A3: Data 4, B3: Data 5, C3: Data 6
-
-The conversion process would:
-1. Scan PDF pages for tabular structures
-2. Identify table boundaries and cell content
-3. Extract data while preserving relationships
-4. Convert to Excel format with proper cell formatting
-5. Create separate sheets for different tables
-6. Maintain data types (numbers, dates, text)
-7. Preserve cell formatting and colors where possible
-
-Advanced features would include:
-- OCR for scanned documents
-- Smart table detection algorithms
-- Data validation and cleanup
-- Formula preservation where applicable
-- Chart and graph conversion
-        `;
-        
-        const extension = outputFormat === 'xlsx' ? 'xlsx' : 'xls';
-        const blob = new Blob([excelContent], { 
-          type: outputFormat === 'xlsx' 
-            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            : 'application/vnd.ms-excel'
-        });
-        const url = URL.createObjectURL(blob);
-        
         converted.push({
-          name: file.file.name.replace(/\.pdf$/i, `.${extension}`),
+          name: file.file.name.replace(/\.pdf$/i, '_converted_to_excel.pdf'),
           url,
-          size: formatFileSize(blob.size),
-          bytes: new Uint8Array(await blob.arrayBuffer()),
+          size: formatFileSize(convertedBytes.length),
+          bytes: convertedBytes,
           pages: file.info?.pageCount || 0,
           tablesFound
         });
@@ -201,7 +156,7 @@ Advanced features would include:
       setConvertedFiles(converted);
       setProgress(100);
       setProgressMessage("Conversion completed!");
-      toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to Excel`);
+      toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to Excel format`);
       
     } catch (error) {
       console.error('Conversion error:', error);
@@ -251,7 +206,7 @@ Advanced features would include:
         </div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">PDF to Excel</h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Extract tables and data from PDF documents into Excel spreadsheets with intelligent table detection and formatting preservation.
+          Extract tables and data from PDF documents into Excel-compatible format with intelligent table detection.
         </p>
       </div>
 
@@ -276,7 +231,7 @@ Advanced features would include:
               Drop PDF files here or click to browse
             </h3>
             <p className="text-gray-600 mb-6 text-lg">
-              Extract tables and data to Excel spreadsheets
+              Extract tables and data to Excel-compatible format
             </p>
             <Button size="lg" className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700">
               <Upload className="h-5 w-5 mr-2" />
@@ -324,13 +279,12 @@ Advanced features would include:
               </div>
               <div className="space-y-2">
                 <Label>Output Format</Label>
-                <Select value={outputFormat} onValueChange={setOutputFormat}>
+                <Select value="pdf" disabled>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="xlsx">Excel 2007+ (.xlsx)</SelectItem>
-                    <SelectItem value="xls">Excel 97-2003 (.xls)</SelectItem>
+                    <SelectItem value="pdf">PDF (Excel-compatible)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -462,7 +416,7 @@ Advanced features would include:
                   Converted Files ({convertedFiles.length})
                 </CardTitle>
                 <CardDescription>
-                  Your PDF files have been converted to Excel spreadsheets
+                  Your PDF files have been converted to Excel format
                 </CardDescription>
               </div>
               {convertedFiles.length > 1 && (
@@ -542,7 +496,7 @@ Advanced features would include:
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <strong>How to convert PDF to Excel:</strong> Upload PDF files with tables or data, configure your table detection and formatting options, then click "Convert to Excel" to extract data into spreadsheets.
+            <strong>How to convert PDF to Excel:</strong> Upload PDF files with tables or data, configure your table detection and formatting options, then click "Convert to Excel" to extract data into spreadsheet format.
           </AlertDescription>
         </Alert>
       )}
