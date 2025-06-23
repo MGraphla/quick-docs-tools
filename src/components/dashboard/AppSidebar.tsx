@@ -18,7 +18,9 @@ import {
   ChevronDown,
   ChevronRight,
   Minimize2,
-  FileType
+  FileType,
+  FileSpreadsheet,
+  Presentation
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -40,14 +42,14 @@ const pdfTools = [
   { name: "Split PDF", path: "/dashboard/split-pdf", icon: Scissors },
   { name: "Compress PDF", path: "/dashboard/compress-pdf", icon: Minimize2 },
   { name: "PDF to Word", path: "/dashboard/pdf-to-word", icon: FileDown },
-  { name: "PDF to PowerPoint", path: "/dashboard/pdf-to-powerpoint", icon: FileDown },
-  { name: "PDF to Excel", path: "/dashboard/pdf-to-excel", icon: FileDown },
+  { name: "PDF to PowerPoint", path: "/dashboard/pdf-to-powerpoint", icon: Presentation },
+  { name: "PDF to Excel", path: "/dashboard/pdf-to-excel", icon: FileSpreadsheet },
+  { name: "PDF to JPG", path: "/dashboard/pdf-to-jpg", icon: Image },
   { name: "Word to PDF", path: "/dashboard/word-to-pdf", icon: FileUp },
   { name: "PowerPoint to PDF", path: "/dashboard/powerpoint-to-pdf", icon: FileUp },
   { name: "Excel to PDF", path: "/dashboard/excel-to-pdf", icon: FileUp },
-  { name: "Edit PDF", path: "/dashboard/edit-pdf", icon: Edit },
-  { name: "PDF to JPG", path: "/dashboard/pdf-to-jpg", icon: Image },
   { name: "JPG to PDF", path: "/dashboard/jpg-to-pdf", icon: FileUp },
+  { name: "Edit PDF", path: "/dashboard/edit-pdf", icon: Edit },
   { name: "Sign PDF", path: "/dashboard/sign-pdf", icon: Signature },
   { name: "Watermark", path: "/dashboard/watermark-pdf", icon: Shield },
   { name: "Rotate PDF", path: "/dashboard/rotate-pdf", icon: Settings },

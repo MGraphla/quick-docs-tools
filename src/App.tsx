@@ -23,6 +23,10 @@ import PowerpointToPdfPage from "./pages/tools/PowerpointToPdfPage";
 import PdfToWordPage from "./pages/tools/PdfToWordPage";
 import CompressPdfPage from "./pages/tools/CompressPdfPage";
 import SplitPdfPage from "./pages/tools/SplitPdfPage";
+import PdfToJpgPage from "./pages/tools/PdfToJpgPage";
+import PdfToPowerpointPage from "./pages/tools/PdfToPowerpointPage";
+import PdfToExcelPage from "./pages/tools/PdfToExcelPage";
+import WordToPdfPage from "./pages/tools/WordToPdfPage";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +55,10 @@ const App = () => (
           <Route path="/dashboard/pdf-to-word" element={<Dashboard><PdfToWordPage /></Dashboard>} />
           <Route path="/dashboard/compress-pdf" element={<Dashboard><CompressPdfPage /></Dashboard>} />
           <Route path="/dashboard/split-pdf" element={<Dashboard><SplitPdfPage /></Dashboard>} />
+          <Route path="/dashboard/pdf-to-jpg" element={<Dashboard><PdfToJpgPage /></Dashboard>} />
+          <Route path="/dashboard/pdf-to-powerpoint" element={<Dashboard><PdfToPowerpointPage /></Dashboard>} />
+          <Route path="/dashboard/pdf-to-excel" element={<Dashboard><PdfToExcelPage /></Dashboard>} />
+          <Route path="/dashboard/word-to-pdf" element={<Dashboard><WordToPdfPage /></Dashboard>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
