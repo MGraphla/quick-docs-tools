@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
+import { saveAs } from 'file-saver';
 
 interface CompressedFile {
   name: string;
@@ -185,15 +186,15 @@ const CompressPdfPage = () => {
   };
 
   const downloadFile = (file: CompressedFile) => {
-    const link = document.createElement('a');
-    link.href = file.url;
-    link.download = file.name;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success(`Downloaded ${file.name}`);
+    try {
+      // Use FileSaver.js to ensure proper download with correct MIME type
+      const blob = new Blob([file.bytes], { type: 'application/pdf' });
+      saveAs(blob, file.name);
+      toast.success(`Downloaded ${file.name}`);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error("Failed to download file. Please try again.");
+    }
   };
 
   const downloadAll = () => {

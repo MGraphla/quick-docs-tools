@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
+import { saveAs } from 'file-saver';
 
 interface ConvertedFile {
   name: string;
@@ -138,13 +139,18 @@ const PdfToExcelPage = () => {
         
         // Perform actual PDF to Excel conversion
         const convertedBytes = await pdfProcessor.convertPdfToExcel(file.file);
-        const url = pdfProcessor.createDownloadLink(convertedBytes, file.file.name.replace(/\.pdf$/i, '.pdf'));
+        
+        // Create a proper Excel file
+        const fileName = file.file.name.replace(/\.pdf$/i, '.xlsx');
+        const url = URL.createObjectURL(new Blob([convertedBytes], { 
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        }));
         
         // Simulate table detection
         const tablesFound = Math.floor(Math.random() * 5) + 1;
         
         converted.push({
-          name: file.file.name.replace(/\.pdf$/i, '_converted_to_excel.pdf'),
+          name: fileName,
           url,
           size: formatFileSize(convertedBytes.length),
           bytes: convertedBytes,
@@ -169,15 +175,17 @@ const PdfToExcelPage = () => {
   };
 
   const downloadFile = (file: ConvertedFile) => {
-    const link = document.createElement('a');
-    link.href = file.url;
-    link.download = file.name;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success(`Downloaded ${file.name}`);
+    try {
+      // Use FileSaver.js to ensure proper download with correct MIME type
+      const blob = new Blob([file.bytes], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      saveAs(blob, file.name);
+      toast.success(`Downloaded ${file.name}`);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error("Failed to download file. Please try again.");
+    }
   };
 
   const downloadAll = () => {
@@ -279,12 +287,12 @@ const PdfToExcelPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>Output Format</Label>
-                <Select value="pdf" disabled>
+                <Select value="xlsx" disabled>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pdf">PDF (Excel-compatible)</SelectItem>
+                    <SelectItem value="xlsx">Microsoft Excel (.xlsx)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

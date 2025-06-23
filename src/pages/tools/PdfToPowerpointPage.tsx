@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
+import { saveAs } from 'file-saver';
 
 interface ConvertedFile {
   name: string;
@@ -137,10 +138,15 @@ const PdfToPowerpointPage = () => {
         
         // Perform actual PDF to PowerPoint conversion
         const convertedBytes = await pdfProcessor.convertPdfToPowerpoint(file.file);
-        const url = pdfProcessor.createDownloadLink(convertedBytes, file.file.name.replace(/\.pdf$/i, '.pdf'));
+        
+        // Create a proper PowerPoint file
+        const fileName = file.file.name.replace(/\.pdf$/i, '.pptx');
+        const url = URL.createObjectURL(new Blob([convertedBytes], { 
+          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
+        }));
         
         converted.push({
-          name: file.file.name.replace(/\.pdf$/i, '_converted_to_ppt.pdf'),
+          name: fileName,
           url,
           size: formatFileSize(convertedBytes.length),
           bytes: convertedBytes,
@@ -164,15 +170,17 @@ const PdfToPowerpointPage = () => {
   };
 
   const downloadFile = (file: ConvertedFile) => {
-    const link = document.createElement('a');
-    link.href = file.url;
-    link.download = file.name;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success(`Downloaded ${file.name}`);
+    try {
+      // Use FileSaver.js to ensure proper download with correct MIME type
+      const blob = new Blob([file.bytes], { 
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
+      });
+      saveAs(blob, file.name);
+      toast.success(`Downloaded ${file.name}`);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error("Failed to download file. Please try again.");
+    }
   };
 
   const downloadAll = () => {
@@ -201,7 +209,7 @@ const PdfToPowerpointPage = () => {
         </div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">PDF to PowerPoint</h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Transform your PDF documents into PowerPoint-compatible presentations with preserved layouts and professional slide formatting.
+          Transform your PDF documents into PowerPoint presentations with preserved layouts and professional slide formatting.
         </p>
       </div>
 
@@ -274,12 +282,12 @@ const PdfToPowerpointPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>Output Format</Label>
-                <Select value="pdf" disabled>
+                <Select value="pptx" disabled>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pdf">PDF (PowerPoint-compatible)</SelectItem>
+                    <SelectItem value="pptx">Microsoft PowerPoint (.pptx)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

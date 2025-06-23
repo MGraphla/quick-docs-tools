@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
+import { saveAs } from 'file-saver';
 
 interface ConvertedFile {
   name: string;
@@ -137,10 +138,15 @@ const PdfToWordPage = () => {
         
         // Perform actual PDF to Word conversion
         const convertedBytes = await pdfProcessor.convertPdfToWord(file.file);
-        const url = pdfProcessor.createDownloadLink(convertedBytes, file.file.name.replace(/\.pdf$/i, '.pdf'));
+        
+        // Create a proper Word document file
+        const fileName = file.file.name.replace(/\.pdf$/i, '.docx');
+        const url = URL.createObjectURL(new Blob([convertedBytes], { 
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+        }));
         
         converted.push({
-          name: file.file.name.replace(/\.pdf$/i, '_converted_to_word.pdf'),
+          name: fileName,
           url,
           size: formatFileSize(convertedBytes.length),
           bytes: convertedBytes,
@@ -164,15 +170,17 @@ const PdfToWordPage = () => {
   };
 
   const downloadFile = (file: ConvertedFile) => {
-    const link = document.createElement('a');
-    link.href = file.url;
-    link.download = file.name;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success(`Downloaded ${file.name}`);
+    try {
+      // Use FileSaver.js to ensure proper download with correct MIME type
+      const blob = new Blob([file.bytes], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+      saveAs(blob, file.name);
+      toast.success(`Downloaded ${file.name}`);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error("Failed to download file. Please try again.");
+    }
   };
 
   const downloadAll = () => {
@@ -273,12 +281,12 @@ const PdfToWordPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>Output Format</Label>
-                <Select value="pdf" disabled>
+                <Select value="docx" disabled>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pdf">PDF (Word-compatible)</SelectItem>
+                    <SelectItem value="docx">Microsoft Word (.docx)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -418,7 +426,7 @@ const PdfToWordPage = () => {
                   Converted Files ({convertedFiles.length})
                 </CardTitle>
                 <CardDescription>
-                  Your PDF files have been converted to Word-compatible format
+                  Your PDF files have been converted to Word format
                 </CardDescription>
               </div>
               {convertedFiles.length > 1 && (
@@ -497,7 +505,7 @@ const PdfToWordPage = () => {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <strong>How to convert PDF to Word:</strong> Upload PDF files, configure your conversion settings for optimal results, then click "Convert to Word" to create editable Word-compatible documents with preserved formatting.
+            <strong>How to convert PDF to Word:</strong> Upload PDF files, configure your conversion settings for optimal results, then click "Convert to Word" to create editable Word documents with preserved formatting.
           </AlertDescription>
         </Alert>
       )}
