@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Mic, MicOff, Download, Trash2, Pause, Play, RefreshCw, Clock, Volume2, VolumeX, Clipboard, Check, FileText, Settings, Zap, RotateCcw, Save, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
