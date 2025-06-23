@@ -32,7 +32,12 @@ import {
   Send,
   Clock,
   Globe,
-  Zap
+  Zap,
+  Sparkles,
+  TrendingUp,
+  FileSpreadsheet,
+  Presentation,
+  Minimize2
 } from "lucide-react";
 import AuthModal from "@/components/auth/AuthModal";
 import { toast } from "sonner";
@@ -50,29 +55,173 @@ const Index = () => {
   const navigate = useNavigate();
 
   const pdfTools = [
-    { name: "Merge PDF", description: "Combine multiple PDF files into one", icon: FileText },
-    { name: "Split PDF", description: "Extract pages or split into separate documents", icon: Scissors },
-    { name: "Compress PDF", description: "Reduce file size while maintaining quality", icon: Archive },
-    { name: "PDF to Word", description: "Convert PDF to editable Word document", icon: FileDown },
-    { name: "PDF to PowerPoint", description: "Convert PDF to editable presentations", icon: FileDown },
-    { name: "PDF to Excel", description: "Convert PDF tables to Excel spreadsheets", icon: FileDown },
-    { name: "Word to PDF", description: "Convert Word documents to PDF", icon: FileUp },
-    { name: "PowerPoint to PDF", description: "Convert presentations to PDF", icon: FileUp },
-    { name: "Excel to PDF", description: "Convert spreadsheets to PDF", icon: FileUp },
-    { name: "Edit PDF", description: "Add text, shapes, images, and annotations", icon: Edit },
-    { name: "PDF to JPG", description: "Convert PDF pages to JPG images", icon: Image },
-    { name: "JPG to PDF", description: "Convert images to PDF document", icon: FileUp },
-    { name: "Sign PDF", description: "Add digital signatures to PDFs", icon: Signature },
-    { name: "Watermark", description: "Add text or image watermarks", icon: Shield },
-    { name: "Rotate PDF", description: "Rotate pages left or right", icon: Settings },
-    { name: "Protect PDF", description: "Add password protection", icon: Shield },
+    { 
+      name: "Merge PDF", 
+      description: "Combine multiple PDF files into one seamless document", 
+      icon: FileText,
+      color: "from-blue-500 to-blue-600",
+      bgColor: "bg-blue-50",
+      iconColor: "text-blue-600",
+      popular: true
+    },
+    { 
+      name: "Split PDF", 
+      description: "Extract pages or split into separate documents with precision", 
+      icon: Scissors,
+      color: "from-green-500 to-green-600",
+      bgColor: "bg-green-50",
+      iconColor: "text-green-600",
+      popular: true
+    },
+    { 
+      name: "Compress PDF", 
+      description: "Reduce file size while maintaining professional quality", 
+      icon: Minimize2,
+      color: "from-purple-500 to-purple-600",
+      bgColor: "bg-purple-50",
+      iconColor: "text-purple-600",
+      popular: true
+    },
+    { 
+      name: "PDF to Word", 
+      description: "Convert PDF to fully editable Word documents", 
+      icon: FileDown,
+      color: "from-orange-500 to-orange-600",
+      bgColor: "bg-orange-50",
+      iconColor: "text-orange-600",
+      popular: true
+    },
+    { 
+      name: "PDF to PowerPoint", 
+      description: "Transform PDFs into editable presentation slides", 
+      icon: Presentation,
+      color: "from-red-500 to-red-600",
+      bgColor: "bg-red-50",
+      iconColor: "text-red-600"
+    },
+    { 
+      name: "PDF to Excel", 
+      description: "Extract tables and data into Excel spreadsheets", 
+      icon: FileSpreadsheet,
+      color: "from-emerald-500 to-emerald-600",
+      bgColor: "bg-emerald-50",
+      iconColor: "text-emerald-600"
+    },
+    { 
+      name: "Word to PDF", 
+      description: "Convert Word documents to professional PDFs", 
+      icon: FileUp,
+      color: "from-indigo-500 to-indigo-600",
+      bgColor: "bg-indigo-50",
+      iconColor: "text-indigo-600"
+    },
+    { 
+      name: "PowerPoint to PDF", 
+      description: "Convert presentations to shareable PDF format", 
+      icon: FileUp,
+      color: "from-pink-500 to-pink-600",
+      bgColor: "bg-pink-50",
+      iconColor: "text-pink-600"
+    },
+    { 
+      name: "Excel to PDF", 
+      description: "Transform spreadsheets into professional PDFs", 
+      icon: FileUp,
+      color: "from-teal-500 to-teal-600",
+      bgColor: "bg-teal-50",
+      iconColor: "text-teal-600"
+    },
+    { 
+      name: "Edit PDF", 
+      description: "Add text, shapes, images, and professional annotations", 
+      icon: Edit,
+      color: "from-violet-500 to-violet-600",
+      bgColor: "bg-violet-50",
+      iconColor: "text-violet-600"
+    },
+    { 
+      name: "PDF to JPG", 
+      description: "Convert PDF pages to high-quality JPG images", 
+      icon: Image,
+      color: "from-cyan-500 to-cyan-600",
+      bgColor: "bg-cyan-50",
+      iconColor: "text-cyan-600"
+    },
+    { 
+      name: "JPG to PDF", 
+      description: "Convert images to professional PDF documents", 
+      icon: FileUp,
+      color: "from-amber-500 to-amber-600",
+      bgColor: "bg-amber-50",
+      iconColor: "text-amber-600"
+    },
+    { 
+      name: "Sign PDF", 
+      description: "Add legally binding digital signatures", 
+      icon: Signature,
+      color: "from-rose-500 to-rose-600",
+      bgColor: "bg-rose-50",
+      iconColor: "text-rose-600"
+    },
+    { 
+      name: "Watermark PDF", 
+      description: "Add professional text or image watermarks", 
+      icon: Shield,
+      color: "from-slate-500 to-slate-600",
+      bgColor: "bg-slate-50",
+      iconColor: "text-slate-600"
+    },
+    { 
+      name: "Rotate PDF", 
+      description: "Rotate pages left or right with precision", 
+      icon: Settings,
+      color: "from-lime-500 to-lime-600",
+      bgColor: "bg-lime-50",
+      iconColor: "text-lime-600"
+    },
+    { 
+      name: "Protect PDF", 
+      description: "Add enterprise-grade password protection", 
+      icon: Shield,
+      color: "from-red-600 to-red-700",
+      bgColor: "bg-red-50",
+      iconColor: "text-red-600"
+    },
   ];
 
   const additionalTools = [
-    { name: "QR Code Generator", description: "Create customizable QR codes", icon: QrCode },
-    { name: "Link Shortener", description: "Shorten URLs with analytics", icon: LinkIcon },
-    { name: "Audio to Text", description: "Local audio transcription", icon: Mic },
-    { name: "Live Transcription", description: "Real-time speech to text", icon: Mic },
+    { 
+      name: "QR Code Generator", 
+      description: "Create customizable QR codes with analytics", 
+      icon: QrCode,
+      color: "from-blue-500 to-purple-600",
+      bgColor: "bg-gradient-to-br from-blue-50 to-purple-50",
+      iconColor: "text-blue-600"
+    },
+    { 
+      name: "Link Shortener", 
+      description: "Shorten URLs with detailed click analytics", 
+      icon: LinkIcon,
+      color: "from-green-500 to-teal-600",
+      bgColor: "bg-gradient-to-br from-green-50 to-teal-50",
+      iconColor: "text-green-600"
+    },
+    { 
+      name: "Audio to Text", 
+      description: "AI-powered local audio transcription", 
+      icon: Mic,
+      color: "from-purple-500 to-pink-600",
+      bgColor: "bg-gradient-to-br from-purple-50 to-pink-50",
+      iconColor: "text-purple-600"
+    },
+    { 
+      name: "Live Transcription", 
+      description: "Real-time speech to text conversion", 
+      icon: Mic,
+      color: "from-orange-500 to-red-600",
+      bgColor: "bg-gradient-to-br from-orange-50 to-red-50",
+      iconColor: "text-orange-600"
+    },
   ];
 
   const features = [
@@ -139,12 +288,12 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden">
+    <div className="min-h-screen bg-white overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full opacity-10 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-400 rounded-full opacity-10 animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full opacity-5 animate-spin" style={{ animationDuration: '20s' }}></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-full animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-purple-400/10 to-pink-400/10 rounded-full animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-blue-200/5 to-purple-200/5 rounded-full animate-spin" style={{ animationDuration: '20s' }}></div>
       </div>
 
       {/* Modern Header */}
@@ -152,33 +301,38 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
             {/* Logo */}
-            <div className="flex items-center space-x-2 hover-scale cursor-pointer" onClick={() => scrollToSection('home')}>
+            <div className="flex items-center space-x-3 hover:scale-105 transition-transform duration-300 cursor-pointer" onClick={() => scrollToSection('home')}>
               <div className="relative">
-                <FileText className="h-8 w-8 text-blue-600" />
+                <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
+                  <FileText className="h-6 w-6 text-white" />
+                </div>
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
               </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                QuickDocs
-              </span>
+              <div>
+                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  QuickDocs
+                </span>
+                <p className="text-xs text-gray-500 font-medium">Professional Tools</p>
+              </div>
             </div>
 
             {/* Navigation Links */}
             <div className="hidden md:flex items-center space-x-8">
               <button 
                 onClick={() => scrollToSection('home')}
-                className={`text-sm font-medium transition-colors hover:text-blue-600 ${activeSection === 'home' ? 'text-blue-600' : 'text-gray-700'}`}
+                className={`text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:scale-105 ${activeSection === 'home' ? 'text-blue-600 font-semibold' : 'text-gray-700'}`}
               >
                 Home
               </button>
               <button 
                 onClick={() => scrollToSection('about')}
-                className={`text-sm font-medium transition-colors hover:text-blue-600 ${activeSection === 'about' ? 'text-blue-600' : 'text-gray-700'}`}
+                className={`text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:scale-105 ${activeSection === 'about' ? 'text-blue-600 font-semibold' : 'text-gray-700'}`}
               >
                 About Us
               </button>
               <button 
                 onClick={() => scrollToSection('contact')}
-                className={`text-sm font-medium transition-colors hover:text-blue-600 ${activeSection === 'contact' ? 'text-blue-600' : 'text-gray-700'}`}
+                className={`text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:scale-105 ${activeSection === 'contact' ? 'text-blue-600 font-semibold' : 'text-gray-700'}`}
               >
                 Contact Us
               </button>
@@ -189,13 +343,13 @@ const Index = () => {
               <Button 
                 variant="ghost" 
                 onClick={() => openAuthModal('signin')}
-                className="hover-scale transition-all duration-300 hover:bg-blue-50 text-gray-700 hover:text-blue-600"
+                className="hover:scale-105 transition-all duration-300 hover:bg-blue-50 text-gray-700 hover:text-blue-600 font-medium"
               >
                 Sign In
               </Button>
               <Button 
                 onClick={() => openAuthModal('signup')}
-                className="hover-scale bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+                className="hover:scale-105 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl font-medium"
               >
                 Get Started
               </Button>
@@ -204,161 +358,192 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section id="home" className="container mx-auto px-4 py-16 relative z-10">
-        <div className="text-center max-w-5xl mx-auto animate-fade-in">
-          <div className="inline-flex items-center bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-6 animate-bounce">
-            <Star className="h-4 w-4 mr-2" />
-            Trusted by 50,000+ users worldwide
+      {/* Enhanced Hero Section */}
+      <section id="home" className="container mx-auto px-4 py-20 relative z-10">
+        <div className="text-center max-w-6xl mx-auto animate-fade-in">
+          <div className="inline-flex items-center bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 px-6 py-3 rounded-full text-sm font-semibold mb-8 animate-bounce shadow-lg">
+            <Star className="h-4 w-4 mr-2 text-yellow-500" />
+            Trusted by 50,000+ professionals worldwide
+            <Sparkles className="h-4 w-4 ml-2 text-purple-500" />
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+          <h1 className="text-6xl md:text-8xl font-bold text-gray-900 mb-8 leading-tight">
             Complete 
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 animate-pulse"> PDF</span> & 
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 animate-pulse"> PDF</span> & 
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600"> Productivity</span> 
-            <span className="inline-block animate-bounce ml-2">⚡</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-purple-800"> Productivity</span> 
+            <span className="inline-block animate-bounce ml-2 text-4xl">⚡</span>
           </h1>
           
-          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-xl md:text-2xl text-gray-600 mb-10 max-w-4xl mx-auto leading-relaxed font-medium">
             Transform, edit, and manage your documents with our comprehensive suite of 
-            <span className="font-semibold text-blue-600"> 25+ professional tools</span>. 
+            <span className="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg mx-1"> 25+ professional tools</span>. 
             Everything you need for document productivity, all in one place.
           </p>
           
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-12">
             <Button 
               size="lg" 
               onClick={() => openAuthModal('signup')} 
-              className="text-lg px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover-scale shadow-xl hover:shadow-2xl transition-all duration-300"
+              className="text-lg px-10 py-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:scale-105 shadow-2xl hover:shadow-3xl transition-all duration-300 font-semibold"
             >
               Start Free Now
-              <ArrowRight className="ml-2 h-5 w-5" />
+              <ArrowRight className="ml-3 h-6 w-6" />
             </Button>
             <Button 
               variant="outline" 
               size="lg" 
               onClick={() => scrollToSection('tools')}
-              className="text-lg px-8 py-4 hover-scale border-2 hover:border-blue-300 transition-all duration-300"
+              className="text-lg px-10 py-6 hover:scale-105 border-2 hover:border-blue-300 transition-all duration-300 font-semibold hover:bg-blue-50"
             >
               View All Tools
+              <Sparkles className="ml-3 h-5 w-5" />
             </Button>
           </div>
 
-          {/* Feature Pills */}
-          <div className="flex flex-wrap justify-center gap-4 mb-12">
+          {/* Enhanced Feature Pills */}
+          <div className="flex flex-wrap justify-center gap-6 mb-16">
             {features.map((feature, index) => (
               <div 
                 key={feature}
-                className="flex items-center bg-white/80 backdrop-blur-sm border border-gray-200 rounded-full px-4 py-2 shadow-sm hover:shadow-md transition-all duration-300 hover-scale"
+                className="flex items-center bg-white/90 backdrop-blur-sm border-2 border-gray-200 rounded-full px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 hover:border-blue-300"
                 style={{ animationDelay: `${0.5 + index * 0.1}s` }}
               >
-                <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                <span className="text-sm font-medium text-gray-700">{feature}</span>
+                <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
+                <span className="text-sm font-semibold text-gray-700">{feature}</span>
               </div>
             ))}
           </div>
 
-          {/* Stats Section */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-16">
+          {/* Enhanced Stats Section */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20">
             {stats.map((stat, index) => (
-              <div key={index} className="text-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mb-3">
-                  <stat.icon className="h-6 w-6 text-white" />
+              <div key={index} className="text-center group hover:scale-105 transition-all duration-300">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300">
+                  <stat.icon className="h-8 w-8 text-white" />
                 </div>
-                <div className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">{stat.number}</div>
-                <div className="text-sm text-gray-600">{stat.label}</div>
+                <div className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{stat.number}</div>
+                <div className="text-sm font-medium text-gray-600">{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Tools Section */}
-      <section id="tools" className="container mx-auto px-4 py-16 relative z-10">
-        <div className="text-center mb-12 animate-fade-in">
-          <Badge variant="secondary" className="mb-4 text-lg px-6 py-2 animate-bounce">25+ Tools Available</Badge>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Everything You Need for 
-            <span className="text-blue-600"> PDF Management</span>
-          </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            From basic conversions to advanced editing, our tools handle all your document needs
-          </p>
-        </div>
-
-        {/* PDF Tools Grid */}
-        <div className="mb-16">
-          <h3 className="text-3xl font-semibold text-gray-900 mb-8 text-center">PDF Tools</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {pdfTools.map((tool, index) => (
-              <Card 
-                key={index} 
-                className="hover:shadow-xl transition-all duration-300 cursor-pointer hover-scale border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white group"
-                onClick={handleToolClick}
-                style={{ animationDelay: `${index * 0.05}s` }}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 rounded-lg bg-blue-50 group-hover:bg-blue-100 transition-colors duration-300">
-                      <tool.icon className="h-6 w-6 text-blue-600 group-hover:scale-110 transition-transform duration-300" />
-                    </div>
-                    <CardTitle className="text-lg group-hover:text-blue-600 transition-colors duration-300">{tool.name}</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="group-hover:text-gray-700 transition-colors duration-300">{tool.description}</CardDescription>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Additional Tools Grid */}
-        <div>
-          <h3 className="text-3xl font-semibold text-gray-900 mb-8 text-center">Productivity Tools</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {additionalTools.map((tool, index) => (
-              <Card 
-                key={index} 
-                className="hover:shadow-xl transition-all duration-300 cursor-pointer hover-scale border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white group"
-                onClick={handleToolClick}
-                style={{ animationDelay: `${index * 0.05}s` }}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 rounded-lg bg-purple-50 group-hover:bg-purple-100 transition-colors duration-300">
-                      <tool.icon className="h-6 w-6 text-purple-600 group-hover:scale-110 transition-transform duration-300" />
-                    </div>
-                    <CardTitle className="text-lg group-hover:text-purple-600 transition-colors duration-300">{tool.name}</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="group-hover:text-gray-700 transition-colors duration-300">{tool.description}</CardDescription>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* About Us Section */}
-      <section id="about" className="bg-gradient-to-r from-gray-50 to-blue-50 py-20">
+      {/* Enhanced Tools Section */}
+      <section id="tools" className="bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 py-24 relative z-10">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              About <span className="text-blue-600">QuickDocs</span>
+          <div className="text-center mb-16 animate-fade-in">
+            <Badge variant="secondary" className="mb-6 text-lg px-8 py-3 animate-bounce bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 font-semibold shadow-lg">
+              25+ Professional Tools Available
+            </Badge>
+            <h2 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+              Everything You Need for 
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600"> PDF Management</span>
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              We're on a mission to simplify document management for everyone. Founded in 2020, 
-              QuickDocs has grown from a simple PDF merger to a comprehensive document productivity platform.
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto font-medium">
+              From basic conversions to advanced editing, our tools handle all your document needs with professional precision
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
+          {/* Enhanced PDF Tools Grid */}
+          <div className="mb-20">
+            <div className="flex items-center justify-center mb-12">
+              <div className="flex items-center bg-white rounded-full px-8 py-4 shadow-lg border-2 border-red-100">
+                <div className="p-2 bg-red-100 rounded-full mr-4">
+                  <FileText className="h-6 w-6 text-red-600" />
+                </div>
+                <h3 className="text-3xl font-bold text-gray-900">PDF Tools</h3>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {pdfTools.map((tool, index) => (
+                <Card 
+                  key={index} 
+                  className="group hover:shadow-2xl transition-all duration-500 cursor-pointer hover:scale-105 border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white relative overflow-hidden"
+                  onClick={handleToolClick}
+                  style={{ animationDelay: `${index * 0.05}s` }}
+                >
+                  {tool.popular && (
+                    <div className="absolute top-3 right-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
+                      POPULAR
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                  <CardHeader className="pb-4 relative z-10">
+                    <div className="flex items-center space-x-4">
+                      <div className={`p-3 rounded-xl ${tool.bgColor} group-hover:scale-110 transition-all duration-300 shadow-md`}>
+                        <tool.icon className={`h-7 w-7 ${tool.iconColor}`} />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-lg group-hover:text-blue-600 transition-colors duration-300 font-semibold">{tool.name}</CardTitle>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="relative z-10">
+                    <CardDescription className="group-hover:text-gray-700 transition-colors duration-300 font-medium leading-relaxed">{tool.description}</CardDescription>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Enhanced Additional Tools Grid */}
+          <div>
+            <div className="flex items-center justify-center mb-12">
+              <div className="flex items-center bg-white rounded-full px-8 py-4 shadow-lg border-2 border-green-100">
+                <div className="p-2 bg-green-100 rounded-full mr-4">
+                  <QrCode className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="text-3xl font-bold text-gray-900">Productivity Tools</h3>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {additionalTools.map((tool, index) => (
+                <Card 
+                  key={index} 
+                  className="group hover:shadow-2xl transition-all duration-500 cursor-pointer hover:scale-105 border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white relative overflow-hidden"
+                  onClick={handleToolClick}
+                  style={{ animationDelay: `${index * 0.05}s` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                  <CardHeader className="pb-4 relative z-10">
+                    <div className="flex items-center space-x-4">
+                      <div className={`p-3 rounded-xl ${tool.bgColor} group-hover:scale-110 transition-all duration-300 shadow-md`}>
+                        <tool.icon className={`h-7 w-7 ${tool.iconColor}`} />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-lg group-hover:text-green-600 transition-colors duration-300 font-semibold">{tool.name}</CardTitle>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="relative z-10">
+                    <CardDescription className="group-hover:text-gray-700 transition-colors duration-300 font-medium leading-relaxed">{tool.description}</CardDescription>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Enhanced About Us Section */}
+      <section id="about" className="bg-white py-24">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl md:text-6xl font-bold text-gray-900 mb-8">
+              About <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">QuickDocs</span>
+            </h2>
+            <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed font-medium">
+              We're on a mission to simplify document management for everyone. Founded in 2020, 
+              QuickDocs has grown from a simple PDF merger to a comprehensive document productivity platform trusted by professionals worldwide.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-20">
             <div>
-              <h3 className="text-3xl font-bold text-gray-900 mb-6">Our Story</h3>
-              <div className="space-y-4 text-gray-600">
+              <h3 className="text-4xl font-bold text-gray-900 mb-8">Our Story</h3>
+              <div className="space-y-6 text-gray-600 text-lg leading-relaxed">
                 <p>
                   QuickDocs was born out of frustration with existing document tools that were either 
                   too complex, too expensive, or required uploading sensitive files to unknown servers.
@@ -378,110 +563,110 @@ const Index = () => {
               <img 
                 src="https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg?auto=compress&cs=tinysrgb&w=800" 
                 alt="Team collaboration" 
-                className="rounded-2xl shadow-2xl"
+                className="rounded-3xl shadow-2xl hover:scale-105 transition-transform duration-500"
               />
-              <div className="absolute -bottom-6 -right-6 bg-white p-4 rounded-xl shadow-lg">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-medium">50,000+ Happy Users</span>
+              <div className="absolute -bottom-8 -right-8 bg-white p-6 rounded-2xl shadow-xl border-2 border-blue-100">
+                <div className="flex items-center space-x-3">
+                  <div className="w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-lg font-bold text-gray-900">50,000+ Happy Users</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Mission, Vision, Values */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-            <Card className="text-center p-8 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-6">
-                <Target className="h-8 w-8 text-blue-600" />
+          {/* Enhanced Mission, Vision, Values */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-20">
+            <Card className="text-center p-10 border-0 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105 bg-gradient-to-br from-blue-50 to-blue-100">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-8 shadow-lg">
+                <Target className="h-10 w-10 text-white" />
               </div>
-              <h4 className="text-xl font-bold text-gray-900 mb-4">Our Mission</h4>
-              <p className="text-gray-600">
+              <h4 className="text-2xl font-bold text-gray-900 mb-6">Our Mission</h4>
+              <p className="text-gray-600 leading-relaxed font-medium">
                 To democratize document processing by making professional-grade tools accessible to everyone, 
                 while maintaining the highest standards of privacy and security.
               </p>
             </Card>
 
-            <Card className="text-center p-8 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-6">
-                <Globe className="h-8 w-8 text-purple-600" />
+            <Card className="text-center p-10 border-0 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105 bg-gradient-to-br from-purple-50 to-purple-100">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl mb-8 shadow-lg">
+                <Globe className="h-10 w-10 text-white" />
               </div>
-              <h4 className="text-xl font-bold text-gray-900 mb-4">Our Vision</h4>
-              <p className="text-gray-600">
+              <h4 className="text-2xl font-bold text-gray-900 mb-6">Our Vision</h4>
+              <p className="text-gray-600 leading-relaxed font-medium">
                 A world where anyone can efficiently manage, edit, and transform documents without 
                 compromising on quality, speed, or security.
               </p>
             </Card>
 
-            <Card className="text-center p-8 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-6">
-                <Award className="h-8 w-8 text-green-600" />
+            <Card className="text-center p-10 border-0 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105 bg-gradient-to-br from-green-50 to-green-100">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl mb-8 shadow-lg">
+                <Award className="h-10 w-10 text-white" />
               </div>
-              <h4 className="text-xl font-bold text-gray-900 mb-4">Our Values</h4>
-              <p className="text-gray-600">
+              <h4 className="text-2xl font-bold text-gray-900 mb-6">Our Values</h4>
+              <p className="text-gray-600 leading-relaxed font-medium">
                 Privacy-first design, user-centric innovation, and unwavering commitment to quality. 
                 We believe great tools should be simple, powerful, and trustworthy.
               </p>
             </Card>
           </div>
 
-          {/* Team Section */}
-          <div className="text-center mb-12">
-            <h3 className="text-3xl font-bold text-gray-900 mb-4">Meet Our Team</h3>
-            <p className="text-xl text-gray-600">
+          {/* Enhanced Team Section */}
+          <div className="text-center mb-16">
+            <h3 className="text-4xl font-bold text-gray-900 mb-6">Meet Our Team</h3>
+            <p className="text-xl text-gray-600 font-medium">
               The passionate people behind QuickDocs
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             {teamMembers.map((member, index) => (
-              <Card key={index} className="text-center p-6 border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover-scale">
+              <Card key={index} className="text-center p-8 border-0 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105 bg-white">
                 <img 
                   src={member.image} 
                   alt={member.name}
-                  className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                  className="w-32 h-32 rounded-full mx-auto mb-6 object-cover shadow-lg hover:scale-110 transition-transform duration-300"
                 />
-                <h4 className="text-xl font-bold text-gray-900 mb-2">{member.name}</h4>
-                <p className="text-blue-600 font-medium mb-3">{member.role}</p>
-                <p className="text-gray-600 text-sm">{member.description}</p>
+                <h4 className="text-2xl font-bold text-gray-900 mb-3">{member.name}</h4>
+                <p className="text-blue-600 font-semibold mb-4 text-lg">{member.role}</p>
+                <p className="text-gray-600 leading-relaxed font-medium">{member.description}</p>
               </Card>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Contact Us Section */}
-      <section id="contact" className="py-20 bg-white">
+      {/* Enhanced Contact Us Section */}
+      <section id="contact" className="py-24 bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              Get in <span className="text-blue-600">Touch</span>
+          <div className="text-center mb-20">
+            <h2 className="text-5xl md:text-6xl font-bold text-gray-900 mb-8">
+              Get in <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Touch</span>
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto font-medium leading-relaxed">
               Have questions, feedback, or need support? We'd love to hear from you. 
               Our team typically responds within 24 hours.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Contact Form */}
-            <Card className="p-8 border-0 shadow-xl">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">Send us a Message</h3>
-              <form onSubmit={handleContactSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+            {/* Enhanced Contact Form */}
+            <Card className="p-10 border-0 shadow-2xl hover:shadow-3xl transition-all duration-500 bg-white">
+              <h3 className="text-3xl font-bold text-gray-900 mb-8">Send us a Message</h3>
+              <form onSubmit={handleContactSubmit} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label htmlFor="name">Full Name</Label>
+                    <Label htmlFor="name" className="text-lg font-semibold">Full Name</Label>
                     <Input
                       id="name"
                       value={contactForm.name}
                       onChange={(e) => handleContactChange('name', e.target.value)}
                       placeholder="Your full name"
                       required
-                      className="mt-1"
+                      className="mt-2 h-12 text-lg"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="email">Email Address</Label>
+                    <Label htmlFor="email" className="text-lg font-semibold">Email Address</Label>
                     <Input
                       id="email"
                       type="email"
@@ -489,97 +674,97 @@ const Index = () => {
                       onChange={(e) => handleContactChange('email', e.target.value)}
                       placeholder="your@email.com"
                       required
-                      className="mt-1"
+                      className="mt-2 h-12 text-lg"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <Label htmlFor="subject">Subject</Label>
+                  <Label htmlFor="subject" className="text-lg font-semibold">Subject</Label>
                   <Input
                     id="subject"
                     value={contactForm.subject}
                     onChange={(e) => handleContactChange('subject', e.target.value)}
                     placeholder="What's this about?"
                     required
-                    className="mt-1"
+                    className="mt-2 h-12 text-lg"
                   />
                 </div>
                 
                 <div>
-                  <Label htmlFor="message">Message</Label>
+                  <Label htmlFor="message" className="text-lg font-semibold">Message</Label>
                   <Textarea
                     id="message"
                     value={contactForm.message}
                     onChange={(e) => handleContactChange('message', e.target.value)}
                     placeholder="Tell us more about your inquiry..."
                     required
-                    className="mt-1 min-h-32"
+                    className="mt-2 min-h-40 text-lg"
                   />
                 </div>
                 
-                <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                  <Send className="h-4 w-4 mr-2" />
+                <Button type="submit" className="w-full h-14 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
+                  <Send className="h-5 w-5 mr-3" />
                   Send Message
                 </Button>
               </form>
             </Card>
 
-            {/* Contact Information */}
-            <div className="space-y-8">
+            {/* Enhanced Contact Information */}
+            <div className="space-y-10">
               <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">Contact Information</h3>
-                <div className="space-y-6">
-                  <div className="flex items-start space-x-4">
-                    <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Mail className="h-6 w-6 text-blue-600" />
+                <h3 className="text-3xl font-bold text-gray-900 mb-8">Contact Information</h3>
+                <div className="space-y-8">
+                  <div className="flex items-start space-x-6">
+                    <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <Mail className="h-8 w-8 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">Email Us</h4>
-                      <p className="text-gray-600">support@quickdocs.com</p>
-                      <p className="text-sm text-gray-500">We'll respond within 24 hours</p>
+                      <h4 className="font-bold text-gray-900 text-xl mb-2">Email Us</h4>
+                      <p className="text-gray-600 text-lg font-medium">support@quickdocs.com</p>
+                      <p className="text-sm text-gray-500 mt-1">We'll respond within 24 hours</p>
                     </div>
                   </div>
 
-                  <div className="flex items-start space-x-4">
-                    <div className="flex-shrink-0 w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                      <Phone className="h-6 w-6 text-green-600" />
+                  <div className="flex items-start space-x-6">
+                    <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <Phone className="h-8 w-8 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">Call Us</h4>
-                      <p className="text-gray-600">+1 (555) 123-4567</p>
-                      <p className="text-sm text-gray-500">Mon-Fri, 9AM-6PM EST</p>
+                      <h4 className="font-bold text-gray-900 text-xl mb-2">Call Us</h4>
+                      <p className="text-gray-600 text-lg font-medium">+1 (555) 123-4567</p>
+                      <p className="text-sm text-gray-500 mt-1">Mon-Fri, 9AM-6PM EST</p>
                     </div>
                   </div>
 
-                  <div className="flex items-start space-x-4">
-                    <div className="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                      <MapPin className="h-6 w-6 text-purple-600" />
+                  <div className="flex items-start space-x-6">
+                    <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <MapPin className="h-8 w-8 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">Visit Us</h4>
-                      <p className="text-gray-600">123 Innovation Drive<br />San Francisco, CA 94105</p>
-                      <p className="text-sm text-gray-500">By appointment only</p>
+                      <h4 className="font-bold text-gray-900 text-xl mb-2">Visit Us</h4>
+                      <p className="text-gray-600 text-lg font-medium">123 Innovation Drive<br />San Francisco, CA 94105</p>
+                      <p className="text-sm text-gray-500 mt-1">By appointment only</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* FAQ Section */}
-              <Card className="p-6 bg-gray-50 border-0">
-                <h4 className="font-bold text-gray-900 mb-4">Frequently Asked Questions</h4>
-                <div className="space-y-3 text-sm">
+              {/* Enhanced FAQ Section */}
+              <Card className="p-8 bg-gradient-to-br from-gray-50 to-blue-50 border-0 shadow-xl">
+                <h4 className="font-bold text-gray-900 mb-6 text-xl">Frequently Asked Questions</h4>
+                <div className="space-y-6">
                   <div>
-                    <p className="font-medium text-gray-900">Is my data secure?</p>
-                    <p className="text-gray-600">Yes! All processing happens in your browser. We never see your files.</p>
+                    <p className="font-semibold text-gray-900 mb-2">Is my data secure?</p>
+                    <p className="text-gray-600 leading-relaxed">Yes! All processing happens in your browser. We never see your files.</p>
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">Do you offer enterprise plans?</p>
-                    <p className="text-gray-600">Yes, we have custom solutions for businesses. Contact us for details.</p>
+                    <p className="font-semibold text-gray-900 mb-2">Do you offer enterprise plans?</p>
+                    <p className="text-gray-600 leading-relaxed">Yes, we have custom solutions for businesses. Contact us for details.</p>
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">Can I use QuickDocs offline?</p>
-                    <p className="text-gray-600">Most tools work offline once loaded. Some features require internet.</p>
+                    <p className="font-semibold text-gray-900 mb-2">Can I use QuickDocs offline?</p>
+                    <p className="text-gray-600 leading-relaxed">Most tools work offline once loaded. Some features require internet.</p>
                   </div>
                 </div>
               </Card>
@@ -588,76 +773,79 @@ const Index = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white py-20 relative overflow-hidden">
+      {/* Enhanced CTA Section */}
+      <section className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-black/20"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/50 via-purple-600/50 to-pink-600/50"></div>
         <div className="container mx-auto px-4 text-center relative z-10">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 animate-fade-in">
+          <h2 className="text-5xl md:text-6xl font-bold mb-6 animate-fade-in">
             Ready to Transform Your Workflow?
           </h2>
-          <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <p className="text-2xl mb-10 opacity-90 max-w-3xl mx-auto animate-fade-in font-medium leading-relaxed" style={{ animationDelay: '0.2s' }}>
             Join thousands of professionals who trust QuickDocs for their document processing needs
           </p>
           <Button 
             size="lg" 
             variant="secondary" 
             onClick={() => openAuthModal('signup')}
-            className="text-lg px-8 py-4 hover-scale bg-white text-gray-900 hover:bg-gray-100 shadow-xl hover:shadow-2xl transition-all duration-300 animate-fade-in"
+            className="text-xl px-12 py-6 hover:scale-105 bg-white text-gray-900 hover:bg-gray-100 shadow-2xl hover:shadow-3xl transition-all duration-300 animate-fade-in font-semibold"
             style={{ animationDelay: '0.4s' }}
           >
             Get Started for Free
-            <ArrowRight className="ml-2 h-5 w-5" />
+            <ArrowRight className="ml-3 h-6 w-6" />
           </Button>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
+      {/* Enhanced Footer */}
+      <footer className="bg-gray-900 text-white py-16">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <FileText className="h-6 w-6 text-blue-400" />
-                <span className="text-xl font-bold">QuickDocs</span>
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
+                  <FileText className="h-6 w-6 text-white" />
+                </div>
+                <span className="text-2xl font-bold">QuickDocs</span>
               </div>
-              <p className="text-gray-400 text-sm">
+              <p className="text-gray-400 leading-relaxed font-medium">
                 Professional document tools that work entirely in your browser. 
                 Fast, secure, and always free.
               </p>
             </div>
             
             <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">PDF Tools</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Productivity Tools</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Enterprise</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API</a></li>
+              <h4 className="font-bold mb-6 text-lg">Product</h4>
+              <ul className="space-y-3 text-gray-400">
+                <li><a href="#" className="hover:text-white transition-colors font-medium">PDF Tools</a></li>
+                <li><a href="#" className="hover:text-white transition-colors font-medium">Productivity Tools</a></li>
+                <li><a href="#" className="hover:text-white transition-colors font-medium">Enterprise</a></li>
+                <li><a href="#" className="hover:text-white transition-colors font-medium">API</a></li>
               </ul>
             </div>
             
             <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><button onClick={() => scrollToSection('about')} className="hover:text-white transition-colors">About Us</button></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><button onClick={() => scrollToSection('contact')} className="hover:text-white transition-colors">Contact</button></li>
+              <h4 className="font-bold mb-6 text-lg">Company</h4>
+              <ul className="space-y-3 text-gray-400">
+                <li><button onClick={() => scrollToSection('about')} className="hover:text-white transition-colors font-medium">About Us</button></li>
+                <li><a href="#" className="hover:text-white transition-colors font-medium">Careers</a></li>
+                <li><a href="#" className="hover:text-white transition-colors font-medium">Blog</a></li>
+                <li><button onClick={() => scrollToSection('contact')} className="hover:text-white transition-colors font-medium">Contact</button></li>
               </ul>
             </div>
             
             <div>
-              <h4 className="font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Security</a></li>
+              <h4 className="font-bold mb-6 text-lg">Support</h4>
+              <ul className="space-y-3 text-gray-400">
+                <li><a href="#" className="hover:text-white transition-colors font-medium">Help Center</a></li>
+                <li><a href="#" className="hover:text-white transition-colors font-medium">Privacy Policy</a></li>
+                <li><a href="#" className="hover:text-white transition-colors font-medium">Terms of Service</a></li>
+                <li><a href="#" className="hover:text-white transition-colors font-medium">Security</a></li>
               </ul>
             </div>
           </div>
           
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
+          <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400 font-medium">
             <p>&copy; 2024 QuickDocs. All rights reserved. Made with ❤️ for document productivity.</p>
           </div>
         </div>
