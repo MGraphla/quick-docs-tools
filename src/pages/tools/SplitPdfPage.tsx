@@ -8,19 +8,20 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { createPdfProcessor, formatFileSize, parsePageRanges, type PdfInfo } from "@/lib/pdfUtils";
 
 interface SplitFile {
   name: string;
   url: string;
   pages: string;
   size: string;
-  preview?: string;
+  bytes: Uint8Array;
 }
 
 const SplitPdfPage = () => {
   const [file, setFile] = useState<File | null>(null);
+  const [pdfInfo, setPdfInfo] = useState<PdfInfo | null>(null);
   const [splitting, setSplitting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [splitMethod, setSplitMethod] = useState("pages");
@@ -29,18 +30,11 @@ const SplitPdfPage = () => {
   const [customRanges, setCustomRanges] = useState<string[]>([]);
   const [splitFiles, setSplitFiles] = useState<SplitFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
-  const [totalPages, setTotalPages] = useState(0);
+  const [progressMessage, setProgressMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfProcessor = createPdfProcessor();
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const handleFileSelect = useCallback((selectedFiles: FileList | null) => {
+  const handleFileSelect = useCallback(async (selectedFiles: FileList | null) => {
     if (!selectedFiles || selectedFiles.length === 0) return;
     
     const selectedFile = selectedFiles[0];
@@ -48,13 +42,21 @@ const SplitPdfPage = () => {
       toast.error("Please select a PDF file");
       return;
     }
+
+    const loadingToast = toast.loading("Loading PDF...");
     
-    setFile(selectedFile);
-    setSplitFiles([]);
-    // Simulate PDF analysis
-    const mockPages = Math.floor(Math.random() * 50) + 5;
-    setTotalPages(mockPages);
-    toast.success(`PDF loaded: ${mockPages} pages detected`);
+    try {
+      const info = await pdfProcessor.loadPdf(selectedFile);
+      setFile(selectedFile);
+      setPdfInfo(info);
+      setSplitFiles([]);
+      toast.success(`PDF loaded: ${info.pageCount} pages detected`);
+    } catch (error) {
+      console.error('Error loading PDF:', error);
+      toast.error(error instanceof Error ? error.message : "Failed to load PDF");
+    } finally {
+      toast.dismiss(loadingToast);
+    }
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -78,8 +80,8 @@ const SplitPdfPage = () => {
 
   const removeFile = () => {
     setFile(null);
+    setPdfInfo(null);
     setSplitFiles([]);
-    setTotalPages(0);
     toast.success("File removed");
   };
 
@@ -96,112 +98,122 @@ const SplitPdfPage = () => {
   };
 
   const validatePageRange = (range: string): boolean => {
-    const rangePattern = /^\d+(-\d+)?$/;
-    if (!rangePattern.test(range)) return false;
+    if (!pdfInfo) return false;
     
-    const [start, end] = range.split('-').map(Number);
-    if (end && start > end) return false;
-    if (start > totalPages || (end && end > totalPages)) return false;
-    
-    return true;
+    try {
+      const ranges = parsePageRanges(range);
+      return ranges.every(r => 
+        r.start >= 1 && 
+        r.end <= pdfInfo.pageCount && 
+        r.start <= r.end
+      );
+    } catch {
+      return false;
+    }
   };
 
   const splitPdf = async () => {
-    if (!file) {
+    if (!file || !pdfInfo) {
       toast.error("Please select a PDF file to split");
       return;
     }
 
-    // Validation based on split method
-    if (splitMethod === "ranges") {
-      if (customRanges.length === 0) {
-        toast.error("Please add at least one page range");
-        return;
-      }
-      
-      const invalidRanges = customRanges.filter(range => !validatePageRange(range));
-      if (invalidRanges.length > 0) {
-        toast.error("Please check your page ranges. Some ranges are invalid.");
-        return;
-      }
-    }
-
-    if (splitMethod === "pages" && (!pagesPerFile || parseInt(pagesPerFile) < 1)) {
-      toast.error("Please specify a valid number of pages per file");
-      return;
-    }
-
-    setSplitting(true);
-    setProgress(0);
+    let ranges: Array<{ start: number; end: number }> = [];
 
     try {
-      let splits: SplitFile[] = [];
-      
-      // Simulate splitting process with realistic progress
+      // Validation and range preparation based on split method
+      if (splitMethod === "ranges") {
+        if (customRanges.length === 0) {
+          toast.error("Please add at least one page range");
+          return;
+        }
+        
+        const invalidRanges = customRanges.filter(range => !validatePageRange(range));
+        if (invalidRanges.length > 0) {
+          toast.error("Please check your page ranges. Some ranges are invalid.");
+          return;
+        }
+
+        // Parse all custom ranges
+        for (const rangeStr of customRanges) {
+          const parsedRanges = parsePageRanges(rangeStr);
+          ranges.push(...parsedRanges);
+        }
+      } else if (splitMethod === "pages") {
+        const pagesPerSplit = parseInt(pagesPerFile);
+        if (!pagesPerFile || pagesPerSplit < 1) {
+          toast.error("Please specify a valid number of pages per file");
+          return;
+        }
+
+        // Create ranges for pages per file
+        for (let i = 0; i < pdfInfo.pageCount; i += pagesPerSplit) {
+          const start = i + 1;
+          const end = Math.min(i + pagesPerSplit, pdfInfo.pageCount);
+          ranges.push({ start, end });
+        }
+      } else if (splitMethod === "individual") {
+        // Create range for each individual page
+        for (let i = 1; i <= pdfInfo.pageCount; i++) {
+          ranges.push({ start: i, end: i });
+        }
+      }
+
+      setSplitting(true);
+      setProgress(0);
+      setProgressMessage("Preparing to split PDF...");
+
+      // Progress simulation
       const steps = [
         { message: "Analyzing PDF structure...", progress: 15 },
-        { message: "Extracting pages...", progress: 40 },
-        { message: "Creating split documents...", progress: 70 },
-        { message: "Optimizing files...", progress: 90 },
-        { message: "Finalizing split...", progress: 100 }
+        { message: "Preparing page extraction...", progress: 30 },
+        { message: "Splitting PDF...", progress: 50 },
+        { message: "Creating split documents...", progress: 75 },
+        { message: "Optimizing files...", progress: 90 }
       ];
 
       for (const step of steps) {
-        await new Promise(resolve => setTimeout(resolve, 600));
+        setProgressMessage(step.message);
         setProgress(step.progress);
+        await new Promise(resolve => setTimeout(resolve, 400));
       }
+
+      setProgressMessage("Finalizing split files...");
+      setProgress(95);
+
+      // Perform actual PDF split
+      const splitPdfBytes = await pdfProcessor.splitPdf(file, ranges);
       
-      if (splitMethod === "pages") {
-        const pagesPerSplit = parseInt(pagesPerFile);
-        const numberOfSplits = Math.ceil(totalPages / pagesPerSplit);
+      setProgress(100);
+      setProgressMessage("Split completed!");
+
+      // Create split file objects
+      const splits: SplitFile[] = splitPdfBytes.map((bytes, index) => {
+        const range = ranges[index];
+        const url = pdfProcessor.createDownloadLink(bytes, `split-${index + 1}.pdf`);
+        const pageStr = range.start === range.end ? 
+          range.start.toString() : 
+          `${range.start}-${range.end}`;
         
-        for (let i = 0; i < numberOfSplits; i++) {
-          const startPage = i * pagesPerSplit + 1;
-          const endPage = Math.min((i + 1) * pagesPerSplit, totalPages);
-          const pageCount = endPage - startPage + 1;
-          const estimatedSize = Math.floor((file.size / totalPages) * pageCount);
-          
-          splits.push({
-            name: `${file.name.replace('.pdf', '')}_part_${i + 1}.pdf`,
-            url: '#',
-            pages: `${startPage}-${endPage}`,
-            size: formatFileSize(estimatedSize)
-          });
-        }
-      } else if (splitMethod === "ranges") {
-        customRanges.forEach((range, index) => {
-          const [start, end] = range.split('-').map(Number);
-          const pageCount = end ? (end - start + 1) : 1;
-          const estimatedSize = Math.floor((file.size / totalPages) * pageCount);
-          
-          splits.push({
-            name: `${file.name.replace('.pdf', '')}_pages_${range.replace('-', '_to_')}.pdf`,
-            url: '#',
-            pages: range,
-            size: formatFileSize(estimatedSize)
-          });
-        });
-      } else if (splitMethod === "individual") {
-        for (let i = 1; i <= totalPages; i++) {
-          const estimatedSize = Math.floor(file.size / totalPages);
-          
-          splits.push({
-            name: `${file.name.replace('.pdf', '')}_page_${i}.pdf`,
-            url: '#',
-            pages: i.toString(),
-            size: formatFileSize(estimatedSize)
-          });
-        }
-      }
+        return {
+          name: `${file.name.replace('.pdf', '')}_pages_${pageStr.replace('-', '_to_')}.pdf`,
+          url,
+          pages: pageStr,
+          size: formatFileSize(bytes.length),
+          bytes
+        };
+      });
       
       setSplitFiles(splits);
       toast.success(`Successfully split PDF into ${splits.length} files`);
       
     } catch (error) {
-      toast.error("Split failed. Please try again.");
+      console.error('Split error:', error);
+      toast.error(error instanceof Error ? error.message : "Split failed. Please try again.");
     } finally {
       setSplitting(false);
       setProgress(0);
+      setProgressMessage("");
     }
   };
 
@@ -225,13 +237,17 @@ const SplitPdfPage = () => {
   };
 
   const getMethodDescription = () => {
+    if (!pdfInfo) return "";
+    
     switch (splitMethod) {
       case "pages":
-        return `Split into files with ${pagesPerFile} page${parseInt(pagesPerFile) > 1 ? 's' : ''} each`;
+        const pagesPerSplit = parseInt(pagesPerFile || "1");
+        const estimatedFiles = Math.ceil(pdfInfo.pageCount / pagesPerSplit);
+        return `Split into ${estimatedFiles} files with ${pagesPerFile} page${parseInt(pagesPerFile) > 1 ? 's' : ''} each`;
       case "ranges":
         return `Split into ${customRanges.length} custom range${customRanges.length > 1 ? 's' : ''}`;
       case "individual":
-        return `Split into ${totalPages} individual page files`;
+        return `Split into ${pdfInfo.pageCount} individual page files`;
       default:
         return "";
     }
@@ -255,7 +271,7 @@ const SplitPdfPage = () => {
       <Card className="border-2 border-dashed border-gray-300 hover:border-green-400 transition-all duration-300">
         <CardContent className="p-8">
           <div
-            className={`text-center transition-all duration-300 ${
+            className={`text-center transition-all duration-300 cursor-pointer ${
               dragOver ? 'scale-105 bg-green-50' : ''
             }`}
             onDragOver={handleDragOver}
@@ -290,7 +306,7 @@ const SplitPdfPage = () => {
       </Card>
 
       {/* File Info */}
-      {file && (
+      {file && pdfInfo && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -306,10 +322,13 @@ const SplitPdfPage = () => {
               <div className="flex-1">
                 <h4 className="font-medium text-gray-900 mb-1">{file.name}</h4>
                 <div className="flex items-center gap-4 text-sm text-gray-500">
-                  <span>{totalPages} pages</span>
+                  <span>{pdfInfo.pageCount} pages</span>
                   <span>{formatFileSize(file.size)}</span>
                   <span>{new Date(file.lastModified).toLocaleDateString()}</span>
                 </div>
+                {pdfInfo.title && (
+                  <p className="text-xs text-gray-400 mt-1">Title: {pdfInfo.title}</p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm">
@@ -330,7 +349,7 @@ const SplitPdfPage = () => {
       )}
 
       {/* Split Configuration */}
-      {file && (
+      {file && pdfInfo && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -360,7 +379,7 @@ const SplitPdfPage = () => {
                       onChange={(e) => setPagesPerFile(e.target.value)}
                       placeholder="e.g., 1, 2, 5"
                       min="1"
-                      max={totalPages}
+                      max={pdfInfo.pageCount}
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       Number of pages to include in each split file
@@ -369,7 +388,7 @@ const SplitPdfPage = () => {
                   <div className="flex items-end">
                     <div className="bg-blue-50 p-3 rounded-lg w-full">
                       <p className="text-sm font-medium text-blue-800">
-                        Will create: {Math.ceil(totalPages / parseInt(pagesPerFile || "1"))} files
+                        Will create: {Math.ceil(pdfInfo.pageCount / parseInt(pagesPerFile || "1"))} files
                       </p>
                     </div>
                   </div>
@@ -428,7 +447,7 @@ const SplitPdfPage = () => {
                     <div>
                       <p className="font-medium text-yellow-800">Individual Page Split</p>
                       <p className="text-sm text-yellow-700 mt-1">
-                        This will create {totalPages} separate PDF files, one for each page in the document.
+                        This will create {pdfInfo.pageCount} separate PDF files, one for each page in the document.
                       </p>
                     </div>
                   </div>
@@ -457,7 +476,7 @@ const SplitPdfPage = () => {
               </div>
               <h3 className="text-lg font-semibold mb-2">Splitting PDF</h3>
               <p className="text-gray-600 mb-4">
-                Processing {totalPages} pages...
+                {progressMessage || `Processing ${pdfInfo?.pageCount || 0} pages...`}
               </p>
               <div className="max-w-md mx-auto">
                 <div className="flex justify-between text-sm mb-2">
@@ -535,7 +554,7 @@ const SplitPdfPage = () => {
       )}
 
       {/* Action Button */}
-      {file && (
+      {file && pdfInfo && (
         <div className="flex flex-col sm:flex-row gap-4">
           <Button
             onClick={splitPdf}

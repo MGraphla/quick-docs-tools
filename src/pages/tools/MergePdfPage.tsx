@@ -6,12 +6,12 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
 
 interface PdfFile {
   id: string;
   file: File;
-  preview?: string;
-  pages?: number;
+  info?: PdfInfo;
   size: string;
 }
 
@@ -19,22 +19,16 @@ const MergePdfPage = () => {
   const [files, setFiles] = useState<PdfFile[]>([]);
   const [merging, setMerging] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [mergedFile, setMergedFile] = useState<string | null>(null);
+  const [mergedFileUrl, setMergedFileUrl] = useState<string | null>(null);
+  const [mergedFileName, setMergedFileName] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false);
+  const [progressMessage, setProgressMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  const pdfProcessor = createPdfProcessor();
 
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
-  const handleFileSelect = useCallback((selectedFiles: FileList | null) => {
+  const handleFileSelect = useCallback(async (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
     
     const validFiles = Array.from(selectedFiles).filter(file => 
@@ -44,16 +38,38 @@ const MergePdfPage = () => {
     if (validFiles.length !== selectedFiles.length) {
       toast.error("Some files were skipped. Only PDF files are supported.");
     }
+
+    if (validFiles.length === 0) return;
+
+    const loadingToast = toast.loading(`Loading ${validFiles.length} PDF file${validFiles.length > 1 ? 's' : ''}...`);
     
-    const newFiles: PdfFile[] = validFiles.map(file => ({
-      id: generateId(),
-      file,
-      pages: Math.floor(Math.random() * 20) + 1, // Simulate page count
-      size: formatFileSize(file.size)
-    }));
-    
-    setFiles(prev => [...prev, ...newFiles]);
-    toast.success(`Added ${validFiles.length} PDF file${validFiles.length > 1 ? 's' : ''}`);
+    try {
+      const newFiles: PdfFile[] = [];
+      
+      for (const file of validFiles) {
+        try {
+          const info = await pdfProcessor.loadPdf(file);
+          newFiles.push({
+            id: generateId(),
+            file,
+            info,
+            size: formatFileSize(file.size)
+          });
+        } catch (error) {
+          console.error(`Error loading ${file.name}:`, error);
+          toast.error(`Failed to load ${file.name}. Please ensure it's a valid PDF.`);
+        }
+      }
+      
+      if (newFiles.length > 0) {
+        setFiles(prev => [...prev, ...newFiles]);
+        toast.success(`Added ${newFiles.length} PDF file${newFiles.length > 1 ? 's' : ''}`);
+      }
+    } catch (error) {
+      toast.error("Failed to load PDF files");
+    } finally {
+      toast.dismiss(loadingToast);
+    }
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -114,53 +130,76 @@ const MergePdfPage = () => {
     
     setMerging(true);
     setProgress(0);
+    setProgressMessage("Preparing to merge PDFs...");
     
     try {
-      // Simulate merging process with realistic progress
+      // Progress simulation with real processing
       const steps = [
         { message: "Analyzing PDF files...", progress: 20 },
-        { message: "Extracting pages...", progress: 40 },
-        { message: "Combining documents...", progress: 60 },
+        { message: "Loading PDF documents...", progress: 40 },
+        { message: "Merging pages...", progress: 60 },
         { message: "Optimizing merged PDF...", progress: 80 },
-        { message: "Finalizing document...", progress: 100 }
+        { message: "Finalizing document...", progress: 95 }
       ];
 
       for (const step of steps) {
-        await new Promise(resolve => setTimeout(resolve, 800));
+        setProgressMessage(step.message);
         setProgress(step.progress);
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
+
+      setProgressMessage("Creating merged PDF...");
+      setProgress(98);
+
+      // Perform actual PDF merge
+      const mergedPdfBytes = await pdfProcessor.mergePdfs(files.map(f => f.file));
       
-      const totalPages = files.reduce((sum, file) => sum + (file.pages || 0), 0);
-      const mergedFileName = `merged-document-${files.length}-files-${totalPages}-pages.pdf`;
-      setMergedFile(mergedFileName);
+      setProgress(100);
+      setProgressMessage("Merge completed!");
+
+      // Create download URL
+      const url = pdfProcessor.createDownloadLink(mergedPdfBytes, 'merged-document.pdf');
+      const totalPages = files.reduce((sum, file) => sum + (file.info?.pageCount || 0), 0);
+      const fileName = `merged-document-${files.length}-files-${totalPages}-pages.pdf`;
+      
+      setMergedFileUrl(url);
+      setMergedFileName(fileName);
       
       toast.success(`Successfully merged ${files.length} PDF files into one document!`);
       
     } catch (error) {
-      toast.error("Merge failed. Please try again.");
+      console.error('Merge error:', error);
+      toast.error(error instanceof Error ? error.message : "Merge failed. Please try again.");
     } finally {
       setMerging(false);
       setProgress(0);
+      setProgressMessage("");
     }
   };
 
   const downloadMerged = () => {
-    // In a real implementation, this would download the actual merged PDF
-    const link = document.createElement('a');
-    link.href = '#';
-    link.download = mergedFile || 'merged-document.pdf';
-    link.click();
-    toast.success("Merged PDF downloaded successfully!");
+    if (mergedFileUrl && mergedFileName) {
+      const link = document.createElement('a');
+      link.href = mergedFileUrl;
+      link.download = mergedFileName;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Merged PDF downloaded successfully!");
+    }
   };
 
   const clearAll = () => {
     setFiles([]);
-    setMergedFile(null);
+    setMergedFileUrl(null);
+    setMergedFileName(null);
     toast.success("All files cleared");
   };
 
   const totalSize = files.reduce((sum, file) => sum + file.file.size, 0);
-  const totalPages = files.reduce((sum, file) => sum + (file.pages || 0), 0);
+  const totalPages = files.reduce((sum, file) => sum + (file.info?.pageCount || 0), 0);
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
@@ -180,7 +219,7 @@ const MergePdfPage = () => {
       <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-all duration-300">
         <CardContent className="p-8">
           <div
-            className={`text-center transition-all duration-300 ${
+            className={`text-center transition-all duration-300 cursor-pointer ${
               dragOver ? 'scale-105 bg-blue-50' : ''
             }`}
             onDragOver={handleDragOver}
@@ -283,7 +322,7 @@ const MergePdfPage = () => {
                         </h4>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <span>{file.pages} pages</span>
+                        <span>{file.info?.pageCount || 0} pages</span>
                         <span>{file.size}</span>
                         <span>{new Date(file.file.lastModified).toLocaleDateString()}</span>
                       </div>
@@ -320,7 +359,7 @@ const MergePdfPage = () => {
               </div>
               <h3 className="text-lg font-semibold mb-2">Merging PDF Files</h3>
               <p className="text-gray-600 mb-4">
-                Combining {files.length} files into one document...
+                {progressMessage || `Combining ${files.length} files into one document...`}
               </p>
               <div className="max-w-md mx-auto">
                 <div className="flex justify-between text-sm mb-2">
@@ -335,7 +374,7 @@ const MergePdfPage = () => {
       )}
 
       {/* Success Result */}
-      {mergedFile && (
+      {mergedFileUrl && mergedFileName && (
         <Card className="border-green-200 bg-green-50">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
@@ -346,7 +385,7 @@ const MergePdfPage = () => {
                 <h3 className="text-lg font-semibold text-green-800 mb-1">
                   Merge Completed Successfully!
                 </h3>
-                <p className="text-green-700 mb-2">{mergedFile}</p>
+                <p className="text-green-700 mb-2">{mergedFileName}</p>
                 <p className="text-sm text-green-600">
                   Combined {files.length} PDF files • {totalPages} total pages • {formatFileSize(totalSize)}
                 </p>
