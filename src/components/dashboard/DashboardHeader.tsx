@@ -54,9 +54,7 @@ export function DashboardHeader() {
             <Button variant="ghost" className="relative h-10 w-10 rounded-full ring-2 ring-blue-100 hover:ring-blue-200 transition-all">
               <Avatar className="h-10 w-10">
                 <AvatarImage src="/avatars/01.png" alt="@user" />
-                <AvatarF
-
-allback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
                   U
                 </AvatarFallback>
               </Avatar>
