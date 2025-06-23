@@ -369,6 +369,7 @@ const ContactUs = () => {
         </div>
       </footer>
     </div>
+  )
   );
 };
 
