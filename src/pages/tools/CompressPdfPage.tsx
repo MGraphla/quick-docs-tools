@@ -155,13 +155,9 @@ const CompressPdfPage = () => {
         const compressedSize = compressedBytes.length;
         const compressionRatio = Math.round(((originalSize - compressedSize) / originalSize) * 100);
         
-        // Create a blob URL for the compressed PDF
-        const blob = new Blob([compressedBytes], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        
         compressed.push({
           name: file.file.name.replace('.pdf', '_compressed.pdf'),
-          url,
+          url: URL.createObjectURL(new Blob([compressedBytes], { type: 'application/pdf' })),
           originalSize,
           compressedSize,
           compressionRatio,

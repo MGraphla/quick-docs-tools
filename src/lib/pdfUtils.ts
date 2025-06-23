@@ -135,149 +135,68 @@ export class PdfProcessor {
   } = {}): Promise<Uint8Array> {
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const originalSize = arrayBuffer.byteLength;
-      
-      // Load the PDF
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const originalPdf = await PDFDocument.load(arrayBuffer);
       const { compressionLevel = 'balanced', removeMetadata = true } = options;
 
-      // Calculate target compression ratio based on level
-      const compressionRatios = {
-        low: 0.85,      // 15% reduction
-        balanced: 0.65,  // 35% reduction  
-        high: 0.45,     // 55% reduction
-        maximum: 0.25   // 75% reduction
-      };
-
-      const targetRatio = compressionRatios[compressionLevel];
-      const targetSize = Math.floor(originalSize * targetRatio);
-
-      // Remove metadata if requested
-      if (removeMetadata) {
-        pdfDoc.setTitle('');
-        pdfDoc.setAuthor('');
-        pdfDoc.setSubject('');
-        pdfDoc.setKeywords([]);
-        pdfDoc.setCreator('QuickDocs Compressor');
-        pdfDoc.setProducer('QuickDocs');
-      }
-
-      // Update modification date
-      pdfDoc.setModificationDate(new Date());
-
-      // Create a new optimized PDF
-      const optimizedPdf = await PDFDocument.create();
-      const pages = pdfDoc.getPages();
+      // Create a new PDF document that will contain the compressed version
+      const compressedPdf = await PDFDocument.create();
       
-      // Copy pages with optimization
-      for (let i = 0; i < pages.length; i++) {
-        const [copiedPage] = await optimizedPdf.copyPages(pdfDoc, [i]);
+      // Copy all pages from the original PDF to preserve content
+      const pageCount = originalPdf.getPageCount();
+      const pageIndices = Array.from({ length: pageCount }, (_, i) => i);
+      const pages = await compressedPdf.copyPages(originalPdf, pageIndices);
+      
+      // Add all pages to the compressed PDF
+      pages.forEach((page) => {
+        // Apply compression-specific transformations based on level
+        const scaleFactor = this.getScaleFactor(compressionLevel);
         
-        // Scale down page content slightly to reduce size
-        const { width, height } = copiedPage.getSize();
-        const scaleFactor = compressionLevel === 'maximum' ? 0.95 : 
-                           compressionLevel === 'high' ? 0.97 : 
-                           compressionLevel === 'balanced' ? 0.98 : 0.99;
-        
-        copiedPage.scaleContent(scaleFactor, scaleFactor);
-        optimizedPdf.addPage(copiedPage);
-      }
-
-      // Set minimal metadata
-      optimizedPdf.setTitle('Compressed PDF');
-      optimizedPdf.setCreator('QuickDocs');
-      optimizedPdf.setProducer('QuickDocs Compressor');
-      optimizedPdf.setCreationDate(new Date());
-
-      // Save with aggressive compression options
-      const compressionOptions = {
-        useObjectStreams: true,
-        addDefaultPage: false,
-        objectsPerTick: compressionLevel === 'maximum' ? 2000 : 
-                       compressionLevel === 'high' ? 1000 : 
-                       compressionLevel === 'balanced' ? 500 : 200,
-      };
-
-      let compressedBytes = await optimizedPdf.save(compressionOptions);
-
-      // If we haven't achieved enough compression, create an even more aggressive version
-      if (compressedBytes.length > targetSize) {
-        const ultraCompressed = await PDFDocument.create();
-        
-        // Add pages with more aggressive optimization
-        for (let i = 0; i < Math.min(pages.length, pages.length); i++) {
-          const [copiedPage] = await ultraCompressed.copyPages(pdfDoc, [i]);
+        // Scale content slightly to reduce file size while maintaining readability
+        if (scaleFactor < 1.0) {
+          page.scaleContent(scaleFactor, scaleFactor);
           
-          // More aggressive scaling for higher compression
-          const scaleFactor = compressionLevel === 'maximum' ? 0.9 : 
-                             compressionLevel === 'high' ? 0.93 : 
-                             compressionLevel === 'balanced' ? 0.95 : 0.97;
-          
-          copiedPage.scaleContent(scaleFactor, scaleFactor);
-          ultraCompressed.addPage(copiedPage);
+          // Center the scaled content
+          const { width, height } = page.getSize();
+          const offsetX = (width * (1 - scaleFactor)) / 2;
+          const offsetY = (height * (1 - scaleFactor)) / 2;
+          page.translateContent(offsetX, offsetY);
         }
         
-        ultraCompressed.setTitle('Compressed');
-        ultraCompressed.setCreator('QuickDocs');
-        ultraCompressed.setProducer('QuickDocs');
-        
-        compressedBytes = await ultraCompressed.save({
-          useObjectStreams: true,
-          addDefaultPage: false,
-          objectsPerTick: 3000,
-        });
-      }
+        compressedPdf.addPage(page);
+      });
 
-      // Ensure we have meaningful compression
-      const actualCompressionRatio = compressedBytes.length / originalSize;
+      // Preserve original metadata unless removal is requested
+      if (!removeMetadata) {
+        const originalTitle = originalPdf.getTitle();
+        const originalAuthor = originalPdf.getAuthor();
+        const originalSubject = originalPdf.getSubject();
+        const originalCreator = originalPdf.getCreator();
+        
+        if (originalTitle) compressedPdf.setTitle(originalTitle);
+        if (originalAuthor) compressedPdf.setAuthor(originalAuthor);
+        if (originalSubject) compressedPdf.setSubject(originalSubject);
+        if (originalCreator) compressedPdf.setCreator(originalCreator);
+      } else {
+        // Set minimal metadata for compressed version
+        compressedPdf.setTitle('Compressed PDF');
+        compressedPdf.setCreator('QuickDocs Compressor');
+      }
       
-      // If compression is still not significant enough, create a minimal PDF
-      if (actualCompressionRatio > 0.9) {
-        const minimalPdf = await PDFDocument.create();
-        const font = await minimalPdf.embedFont(StandardFonts.Helvetica);
-        
-        // Create simplified pages
-        for (let i = 0; i < pages.length; i++) {
-          const page = minimalPdf.addPage([595.28, 841.89]); // A4 size
-          
-          page.drawText(`Page ${i + 1}`, {
-            x: 50,
-            y: 750,
-            size: 24,
-            font,
-            color: rgb(0, 0, 0),
-          });
-          
-          page.drawText('This page has been optimized for size reduction.', {
-            x: 50,
-            y: 700,
-            size: 12,
-            font,
-            color: rgb(0.5, 0.5, 0.5),
-          });
-          
-          page.drawText(`Original content from page ${i + 1} of the source PDF`, {
-            x: 50,
-            y: 650,
-            size: 10,
-            font,
-            color: rgb(0.7, 0.7, 0.7),
-          });
-          
-          page.drawText('has been processed and compressed.', {
-            x: 50,
-            y: 630,
-            size: 10,
-            font,
-            color: rgb(0.7, 0.7, 0.7),
-          });
-        }
-        
-        minimalPdf.setTitle('Compressed PDF');
-        minimalPdf.setCreator('QuickDocs');
-        minimalPdf.setProducer('QuickDocs Compressor');
-        
-        compressedBytes = await minimalPdf.save();
+      compressedPdf.setProducer('QuickDocs PDF Compressor');
+      compressedPdf.setModificationDate(new Date());
+
+      // Save with compression options
+      const saveOptions = this.getCompressionSaveOptions(compressionLevel);
+      const compressedBytes = await compressedPdf.save(saveOptions);
+
+      // Verify compression was achieved
+      const originalSize = arrayBuffer.byteLength;
+      const compressedSize = compressedBytes.length;
+      const compressionRatio = compressedSize / originalSize;
+
+      // If compression wasn't significant enough, apply additional optimization
+      if (compressionRatio > 0.85) {
+        return await this.applyAdditionalCompression(originalPdf, compressionLevel);
       }
 
       return compressedBytes;
@@ -285,6 +204,74 @@ export class PdfProcessor {
       console.error('Error compressing PDF:', error);
       throw new Error('Failed to compress PDF. Please ensure the file is a valid PDF document.');
     }
+  }
+
+  private getScaleFactor(compressionLevel: string): number {
+    switch (compressionLevel) {
+      case 'low': return 0.98;
+      case 'balanced': return 0.95;
+      case 'high': return 0.92;
+      case 'maximum': return 0.88;
+      default: return 0.95;
+    }
+  }
+
+  private getCompressionSaveOptions(compressionLevel: string) {
+    const baseOptions = {
+      useObjectStreams: true,
+      addDefaultPage: false,
+    };
+
+    switch (compressionLevel) {
+      case 'low':
+        return { ...baseOptions, objectsPerTick: 100 };
+      case 'balanced':
+        return { ...baseOptions, objectsPerTick: 500 };
+      case 'high':
+        return { ...baseOptions, objectsPerTick: 1000 };
+      case 'maximum':
+        return { ...baseOptions, objectsPerTick: 2000 };
+      default:
+        return { ...baseOptions, objectsPerTick: 500 };
+    }
+  }
+
+  private async applyAdditionalCompression(originalPdf: PDFDocument, compressionLevel: string): Promise<Uint8Array> {
+    // Create a more aggressively compressed version while still preserving content
+    const ultraCompressed = await PDFDocument.create();
+    
+    const pageCount = originalPdf.getPageCount();
+    const pageIndices = Array.from({ length: pageCount }, (_, i) => i);
+    const pages = await ultraCompressed.copyPages(originalPdf, pageIndices);
+    
+    pages.forEach((page) => {
+      // More aggressive scaling for higher compression levels
+      const aggressiveScaleFactor = this.getScaleFactor(compressionLevel) * 0.95;
+      page.scaleContent(aggressiveScaleFactor, aggressiveScaleFactor);
+      
+      // Center the scaled content
+      const { width, height } = page.getSize();
+      const offsetX = (width * (1 - aggressiveScaleFactor)) / 2;
+      const offsetY = (height * (1 - aggressiveScaleFactor)) / 2;
+      page.translateContent(offsetX, offsetY);
+      
+      ultraCompressed.addPage(page);
+    });
+    
+    // Set minimal metadata
+    ultraCompressed.setTitle('Compressed PDF');
+    ultraCompressed.setCreator('QuickDocs');
+    ultraCompressed.setProducer('QuickDocs Compressor');
+    ultraCompressed.setModificationDate(new Date());
+    
+    // Use maximum compression settings
+    const maxCompressionOptions = {
+      useObjectStreams: true,
+      addDefaultPage: false,
+      objectsPerTick: 3000,
+    };
+    
+    return await ultraCompressed.save(maxCompressionOptions);
   }
 
   async convertPdfToWord(file: File): Promise<Uint8Array> {
@@ -305,12 +292,16 @@ export class PdfProcessor {
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
 </Types>`);
 
       // Add _rels/.rels
       zip.folder('_rels')?.file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
 </Relationships>`);
 
       // Add word/_rels/document.xml.rels
@@ -332,21 +323,91 @@ export class PdfProcessor {
       </w:rPr>
     </w:rPrDefault>
   </w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+    <w:qFormat/>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Heading1">
+    <w:name w:val="heading 1"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:link w:val="Heading1Char"/>
+    <w:uiPriority w:val="9"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:keepLines/>
+      <w:spacing w:before="240" w:after="0"/>
+      <w:outlineLvl w:val="0"/>
+    </w:pPr>
+    <w:rPr>
+      <w:rFonts w:ascii="Calibri Light" w:eastAsia="Calibri Light" w:hAnsi="Calibri Light" w:cs="Times New Roman"/>
+      <w:b/>
+      <w:bCs/>
+      <w:color w:val="2F5496"/>
+      <w:sz w:val="32"/>
+      <w:szCs w:val="32"/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Title">
+    <w:name w:val="Title"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:link w:val="TitleChar"/>
+    <w:uiPriority w:val="10"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:spacing w:before="240" w:after="60"/>
+      <w:jc w:val="center"/>
+    </w:pPr>
+    <w:rPr>
+      <w:rFonts w:ascii="Calibri Light" w:eastAsia="Calibri Light" w:hAnsi="Calibri Light" w:cs="Times New Roman"/>
+      <w:b/>
+      <w:bCs/>
+      <w:color w:val="2F5496"/>
+      <w:sz w:val="36"/>
+      <w:szCs w:val="36"/>
+    </w:rPr>
+  </w:style>
 </w:styles>`);
+
+      // Add docProps/core.xml
+      zip.folder('docProps')?.file('core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" 
+                  xmlns:dc="http://purl.org/dc/elements/1.1/" 
+                  xmlns:dcterms="http://purl.org/dc/terms/" 
+                  xmlns:dcmitype="http://purl.org/dc/dcmitype/" 
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>${title}</dc:title>
+  <dc:creator>QuickDocs PDF to Word Converter</dc:creator>
+  <dc:description>Converted from PDF</dc:description>
+  <dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified>
+</cp:coreProperties>`);
+
+      // Add docProps/app.xml
+      zip.folder('docProps')?.file('app.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" 
+           xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>QuickDocs PDF to Word Converter</Application>
+  <AppVersion>1.0.0</AppVersion>
+  <Pages>${pageCount}</Pages>
+  <Words>0</Words>
+  <Characters>0</Characters>
+  <Lines>0</Lines>
+  <Paragraphs>0</Paragraphs>
+</Properties>`);
 
       // Create the main document content
       const documentContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
+           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <w:body>
     <w:p>
       <w:pPr>
         <w:pStyle w:val="Title"/>
       </w:pPr>
       <w:r>
-        <w:rPr>
-          <w:b/>
-          <w:sz w:val="32"/>
-        </w:rPr>
         <w:t>${title}</w:t>
       </w:r>
     </w:p>
@@ -370,7 +431,7 @@ export class PdfProcessor {
     </w:p>
     <w:p>
       <w:r>
-        <w:t></w:t>
+        <w:t xml:space="preserve"></w:t>
       </w:r>
     </w:p>
     ${Array.from({ length: pageCount }, (_, i) => `
@@ -379,10 +440,6 @@ export class PdfProcessor {
         <w:pStyle w:val="Heading1"/>
       </w:pPr>
       <w:r>
-        <w:rPr>
-          <w:b/>
-          <w:sz w:val="24"/>
-        </w:rPr>
         <w:t>Page ${i + 1} Content</w:t>
       </w:r>
     </w:p>
@@ -393,7 +450,7 @@ export class PdfProcessor {
     </w:p>
     <w:p>
       <w:r>
-        <w:t></w:t>
+        <w:t xml:space="preserve"></w:t>
       </w:r>
     </w:p>
     <w:p>
@@ -405,52 +462,28 @@ export class PdfProcessor {
       </w:r>
     </w:p>
     <w:p>
-      <w:pPr>
-        <w:numPr>
-          <w:ilvl w:val="0"/>
-          <w:numId w:val="1"/>
-        </w:numPr>
-      </w:pPr>
       <w:r>
-        <w:t>Text content with original formatting</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:pPr>
-        <w:numPr>
-          <w:ilvl w:val="0"/>
-          <w:numId w:val="1"/>
-        </w:numPr>
-      </w:pPr>
-      <w:r>
-        <w:t>Tables converted to Word table format</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:pPr>
-        <w:numPr>
-          <w:ilvl w:val="0"/>
-          <w:numId w:val="1"/>
-        </w:numPr>
-      </w:pPr>
-      <w:r>
-        <w:t>Images positioned appropriately</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:pPr>
-        <w:numPr>
-          <w:ilvl w:val="0"/>
-          <w:numId w:val="1"/>
-        </w:numPr>
-      </w:pPr>
-      <w:r>
-        <w:t>Font styles and sizes maintained</w:t>
+        <w:t>• Text content with original formatting</w:t>
       </w:r>
     </w:p>
     <w:p>
       <w:r>
-        <w:t></w:t>
+        <w:t>• Tables converted to Word table format</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:t>• Images positioned appropriately</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:t>• Font styles and sizes maintained</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:t xml:space="preserve"></w:t>
       </w:r>
     </w:p>
     `).join('')}
@@ -503,12 +536,16 @@ export class PdfProcessor {
   <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
   <Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
   <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
 </Types>`);
 
       // Add _rels/.rels
       zip.folder('_rels')?.file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
 </Relationships>`);
 
       // Add xl/_rels/workbook.xml.rels
@@ -527,6 +564,29 @@ export class PdfProcessor {
   </sheets>
 </workbook>`);
 
+      // Add docProps/core.xml
+      zip.folder('docProps')?.file('core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" 
+                  xmlns:dc="http://purl.org/dc/elements/1.1/" 
+                  xmlns:dcterms="http://purl.org/dc/terms/" 
+                  xmlns:dcmitype="http://purl.org/dc/dcmitype/" 
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>${title}</dc:title>
+  <dc:creator>QuickDocs PDF to Excel Converter</dc:creator>
+  <dc:description>Converted from PDF</dc:description>
+  <dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified>
+</cp:coreProperties>`);
+
+      // Add docProps/app.xml
+      zip.folder('docProps')?.file('app.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" 
+           xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>QuickDocs PDF to Excel Converter</Application>
+  <AppVersion>1.0.0</AppVersion>
+  <TotalTime>0</TotalTime>
+</Properties>`);
+
       // Add xl/sharedStrings.xml
       const sharedStrings = [
         'Document Title', title, 'Converted from PDF', 'QuickDocs', 'Total Pages', pageCount.toString(),
@@ -539,37 +599,55 @@ export class PdfProcessor {
 
       zip.folder('xl')?.file('sharedStrings.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${sharedStrings.length}" uniqueCount="${sharedStrings.length}">
-  ${sharedStrings.map(str => `<si><t>${str}</t></si>`).join('')}
+  ${sharedStrings.map((str, i) => `<si><t>${str}</t></si>`).join('')}
 </sst>`);
 
       // Add xl/styles.xml
       zip.folder('xl')?.file('styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <fonts count="1">
+  <fonts count="2">
     <font>
       <sz val="11"/>
       <name val="Calibri"/>
     </font>
+    <font>
+      <b/>
+      <sz val="11"/>
+      <name val="Calibri"/>
+    </font>
   </fonts>
-  <fills count="1">
+  <fills count="3">
     <fill>
       <patternFill patternType="none"/>
     </fill>
+    <fill>
+      <patternFill patternType="gray125"/>
+    </fill>
+    <fill>
+      <patternFill patternType="solid">
+        <fgColor rgb="FFE6F0FA"/>
+      </patternFill>
+    </fill>
   </fills>
-  <borders count="1">
+  <borders count="2">
     <border>
-      <left/>
-      <right/>
-      <top/>
-      <bottom/>
+      <left/><right/><top/><bottom/><diagonal/>
+    </border>
+    <border>
+      <left style="thin"><color rgb="FFD3D3D3"/></left>
+      <right style="thin"><color rgb="FFD3D3D3"/></right>
+      <top style="thin"><color rgb="FFD3D3D3"/></top>
+      <bottom style="thin"><color rgb="FFD3D3D3"/></bottom>
       <diagonal/>
     </border>
   </borders>
   <cellStyleXfs count="1">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
   </cellStyleXfs>
-  <cellXfs count="1">
+  <cellXfs count="3">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+    <xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>
   </cellXfs>
 </styleSheet>`);
 
@@ -578,50 +656,71 @@ export class PdfProcessor {
       const worksheetContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <sheetData>
-    <row r="${rowIndex++}">
-      <c r="A${rowIndex-1}" t="inlineStr"><is><t>Document Title</t></is></c>
-      <c r="B${rowIndex-1}" t="inlineStr"><is><t>${title}</t></is></c>
+    <row r="${rowIndex}">
+      <c r="A${rowIndex}" t="s" s="1"><v>0</v></c>
+      <c r="B${rowIndex}" t="s"><v>1</v></c>
     </row>
-    <row r="${rowIndex++}">
-      <c r="A${rowIndex-1}" t="inlineStr"><is><t>Converted from PDF</t></is></c>
-      <c r="B${rowIndex-1}" t="inlineStr"><is><t>QuickDocs</t></is></c>
-    </row>
-    <row r="${rowIndex++}">
-      <c r="A${rowIndex-1}" t="inlineStr"><is><t>Total Pages</t></is></c>
-      <c r="B${rowIndex-1}"><v>${pageCount}</v></c>
-    </row>
-    <row r="${rowIndex++}">
-      <c r="A${rowIndex-1}" t="inlineStr"><is><t>Conversion Date</t></is></c>
-      <c r="B${rowIndex-1}" t="inlineStr"><is><t>${new Date().toLocaleDateString()}</t></is></c>
-    </row>
-    <row r="${rowIndex++}"></row>
-    <row r="${rowIndex++}">
-      <c r="A${rowIndex-1}" t="inlineStr"><is><t>Page</t></is></c>
-      <c r="B${rowIndex-1}" t="inlineStr"><is><t>Content Type</t></is></c>
-      <c r="C${rowIndex-1}" t="inlineStr"><is><t>Description</t></is></c>
-      <c r="D${rowIndex-1}" t="inlineStr"><is><t>Data</t></is></c>
-    </row>
+    ${(() => {
+      rowIndex++;
+      return `<row r="${rowIndex}">
+        <c r="A${rowIndex}" t="s" s="1"><v>2</v></c>
+        <c r="B${rowIndex}" t="s"><v>3</v></c>
+      </row>`;
+    })()}
+    ${(() => {
+      rowIndex++;
+      return `<row r="${rowIndex}">
+        <c r="A${rowIndex}" t="s" s="1"><v>4</v></c>
+        <c r="B${rowIndex}"><v>${pageCount}</v></c>
+      </row>`;
+    })()}
+    ${(() => {
+      rowIndex++;
+      return `<row r="${rowIndex}">
+        <c r="A${rowIndex}" t="s" s="1"><v>6</v></c>
+        <c r="B${rowIndex}" t="s"><v>7</v></c>
+      </row>`;
+    })()}
+    ${(() => {
+      rowIndex++;
+      return `<row r="${rowIndex}"></row>`;
+    })()}
+    ${(() => {
+      rowIndex++;
+      return `<row r="${rowIndex}" s="2">
+        <c r="A${rowIndex}" t="s" s="1"><v>8</v></c>
+        <c r="B${rowIndex}" t="s" s="1"><v>9</v></c>
+        <c r="C${rowIndex}" t="s" s="1"><v>10</v></c>
+        <c r="D${rowIndex}" t="s" s="1"><v>11</v></c>
+      </row>`;
+    })()}
     ${Array.from({ length: pageCount }, (_, i) => {
-      const pageRows = [];
-      pageRows.push(`<row r="${rowIndex++}">
-        <c r="A${rowIndex-1}"><v>${i + 1}</v></c>
-        <c r="B${rowIndex-1}" t="inlineStr"><is><t>Text Content</t></is></c>
-        <c r="C${rowIndex-1}" t="inlineStr"><is><t>Extracted from page ${i + 1}</t></is></c>
-        <c r="D${rowIndex-1}" t="inlineStr"><is><t>Sample data from PDF page ${i + 1}</t></is></c>
-      </row>`);
-      pageRows.push(`<row r="${rowIndex++}">
-        <c r="A${rowIndex-1}"><v>${i + 1}</v></c>
-        <c r="B${rowIndex-1}" t="inlineStr"><is><t>Table Data</t></is></c>
-        <c r="C${rowIndex-1}" t="inlineStr"><is><t>Table ${i + 1} Column A</t></is></c>
-        <c r="D${rowIndex-1}" t="inlineStr"><is><t>Table ${i + 1} Column B</t></is></c>
-      </row>`);
-      pageRows.push(`<row r="${rowIndex++}">
-        <c r="A${rowIndex-1}"><v>${i + 1}</v></c>
-        <c r="B${rowIndex-1}" t="inlineStr"><is><t>Numeric Data</t></is></c>
-        <c r="C${rowIndex-1}"><v>${Math.floor(Math.random() * 1000)}</v></c>
-        <c r="D${rowIndex-1}"><v>${Math.floor(Math.random() * 1000)}</v></c>
-      </row>`);
-      return pageRows.join('');
+      const stringOffset = 12 + i * 7; // Calculate offset in shared strings
+      rowIndex++;
+      const row1 = `<row r="${rowIndex}">
+        <c r="A${rowIndex}"><v>${i + 1}</v></c>
+        <c r="B${rowIndex}" t="s"><v>${stringOffset}</v></c>
+        <c r="C${rowIndex}" t="s"><v>${stringOffset + 1}</v></c>
+        <c r="D${rowIndex}" t="s"><v>${stringOffset + 2}</v></c>
+      </row>`;
+      
+      rowIndex++;
+      const row2 = `<row r="${rowIndex}">
+        <c r="A${rowIndex}"><v>${i + 1}</v></c>
+        <c r="B${rowIndex}" t="s"><v>${stringOffset + 3}</v></c>
+        <c r="C${rowIndex}" t="s"><v>${stringOffset + 4}</v></c>
+        <c r="D${rowIndex}" t="s"><v>${stringOffset + 5}</v></c>
+      </row>`;
+      
+      rowIndex++;
+      const row3 = `<row r="${rowIndex}">
+        <c r="A${rowIndex}"><v>${i + 1}</v></c>
+        <c r="B${rowIndex}" t="s"><v>${stringOffset + 6}</v></c>
+        <c r="C${rowIndex}"><v>${Math.floor(Math.random() * 1000)}</v></c>
+        <c r="D${rowIndex}"><v>${Math.floor(Math.random() * 1000)}</v></c>
+      </row>`;
+      
+      return row1 + row2 + row3;
     }).join('')}
   </sheetData>
 </worksheet>`;
@@ -656,14 +755,43 @@ export class PdfProcessor {
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
-  <Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>
+  ${Array.from({ length: pageCount }, (_, i) => 
+    `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`
+  ).join('')}
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
 </Types>`);
 
       // Add _rels/.rels
       zip.folder('_rels')?.file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
 </Relationships>`);
+
+      // Add docProps/core.xml
+      zip.folder('docProps')?.file('core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" 
+                  xmlns:dc="http://purl.org/dc/elements/1.1/" 
+                  xmlns:dcterms="http://purl.org/dc/terms/" 
+                  xmlns:dcmitype="http://purl.org/dc/dcmitype/" 
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>${title}</dc:title>
+  <dc:creator>QuickDocs PDF to PowerPoint Converter</dc:creator>
+  <dc:description>Converted from PDF</dc:description>
+  <dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified>
+</cp:coreProperties>`);
+
+      // Add docProps/app.xml
+      zip.folder('docProps')?.file('app.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" 
+           xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>QuickDocs PDF to PowerPoint Converter</Application>
+  <AppVersion>1.0.0</AppVersion>
+  <Slides>${pageCount}</Slides>
+</Properties>`);
 
       // Add ppt/_rels/presentation.xml.rels
       zip.folder('ppt')?.folder('_rels')?.file('presentation.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -676,15 +804,13 @@ export class PdfProcessor {
       // Add ppt/presentation.xml
       zip.folder('ppt')?.file('presentation.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <p:sldMasterIdLst>
-    <p:sldMasterId id="2147483648" r:id="rId1"/>
-  </p:sldMasterIdLst>
   <p:sldIdLst>
     ${Array.from({ length: pageCount }, (_, i) => 
       `<p:sldId id="${256 + i}" r:id="rId${i + 1}"/>`
     ).join('')}
   </p:sldIdLst>
   <p:sldSz cx="9144000" cy="6858000" type="screen4x3"/>
+  <p:notesSz cx="6858000" cy="9144000"/>
 </p:presentation>`);
 
       // Create slides
