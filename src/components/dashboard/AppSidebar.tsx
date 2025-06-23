@@ -61,24 +61,25 @@ const productivityTools = [
 ];
 
 export function AppSidebar() {
-  const { collapsed } = useSidebar();
+  const { state } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
   const [pdfToolsOpen, setPdfToolsOpen] = useState(true);
   const [productivityToolsOpen, setProductivityToolsOpen] = useState(true);
 
   const isActive = (path: string) => location.pathname === path;
+  const isCollapsed = state === "collapsed";
 
   return (
-    <Sidebar className={collapsed ? "w-14" : "w-64"} collapsible>
+    <Sidebar className={isCollapsed ? "w-14" : "w-64"} collapsible="icon">
       <SidebarHeader className="border-b p-4">
-        {!collapsed && (
+        {!isCollapsed && (
           <div className="flex items-center space-x-2">
             <FileText className="h-8 w-8 text-blue-600" />
             <span className="text-xl font-bold">QuickDocs</span>
           </div>
         )}
-        {collapsed && (
+        {isCollapsed && (
           <FileText className="h-8 w-8 text-blue-600 mx-auto" />
         )}
       </SidebarHeader>
@@ -92,13 +93,13 @@ export function AppSidebar() {
                 isActive={isActive('/dashboard')}
               >
                 <Home className="h-4 w-4" />
-                {!collapsed && <span>Dashboard</span>}
+                {!isCollapsed && <span>Dashboard</span>}
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
 
-        {!collapsed && (
+        {!isCollapsed && (
           <>
             <SidebarGroup>
               <Collapsible open={pdfToolsOpen} onOpenChange={setPdfToolsOpen}>
