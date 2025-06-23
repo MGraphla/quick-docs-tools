@@ -7,50 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { 
-  FileText, 
-  Scissors, 
-  Archive, 
-  FileDown, 
-  FileUp, 
-  Edit, 
-  Image, 
-  Shield, 
-  Settings,
-  QrCode,
-  Link as LinkIcon,
-  Mic,
-  Signature,
-  Star,
-  ArrowRight,
-  CheckCircle,
-  Users,
-  Target,
-  Award,
-  Mail,
-  Phone,
-  MapPin,
-  Send,
-  Clock,
-  Globe,
-  Zap,
-  Sparkles,
-  FileSpreadsheet,
-  Presentation,
-  Minimize2,
-  RotateCw,
-  Type,
-  Highlighter,
-  Rocket,
-  Crown,
-  Diamond,
-  Flame,
-  Heart,
-  Lightbulb,
-  Magic,
-  Palette,
-  Wand2
-} from "lucide-react";
+import { FileText, Scissors, Archive, FileDown, FileUp, Edit, Image, Shield, Settings, QrCode, Link as LinkIcon, Mic, Signature, Star, ArrowRight, CheckCircle, Users, Target, Award, Mail, Phone, MapPin, Send, Clock, Globe, Zap, Sparkles, FileSpreadsheet, Presentation, Minimize2, RotateCw, Type, Highlighter, Rocket, Crown, Diamond, Flame, Heart, Lightbulb, Magnet as Magic, Palette, Wand2 } from "lucide-react";
 import AuthModal from "@/components/auth/AuthModal";
 import { toast } from "sonner";
 
