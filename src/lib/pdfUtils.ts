@@ -1,4 +1,4 @@
-import { PDFDocument, PDFPage, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFPage, rgb, StandardFonts, degrees } from 'pdf-lib';
 import JSZip from 'jszip';
 
 export interface PdfInfo {
@@ -136,7 +136,7 @@ export class PdfProcessor {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const originalPdf = await PDFDocument.load(arrayBuffer);
-      const { compressionLevel = 'balanced', removeMetadata = true } = options;
+      const { compressionLevel = 'balanced', imageQuality = 80, removeMetadata = true } = options;
 
       // Create a new PDF document that will contain the compressed version
       const compressedPdf = await PDFDocument.create();
@@ -196,7 +196,7 @@ export class PdfProcessor {
 
       // If compression wasn't significant enough, apply additional optimization
       if (compressionRatio > 0.85) {
-        return await this.applyAdditionalCompression(originalPdf, compressionLevel);
+        return await this.applyAdditionalCompression(originalPdf, compressionLevel, imageQuality);
       }
 
       return compressedBytes;
@@ -236,7 +236,11 @@ export class PdfProcessor {
     }
   }
 
-  private async applyAdditionalCompression(originalPdf: PDFDocument, compressionLevel: string): Promise<Uint8Array> {
+  private async applyAdditionalCompression(
+    originalPdf: PDFDocument, 
+    compressionLevel: string,
+    imageQuality: number = 80
+  ): Promise<Uint8Array> {
     // Create a more aggressively compressed version while still preserving content
     const ultraCompressed = await PDFDocument.create();
     
@@ -255,6 +259,13 @@ export class PdfProcessor {
       const offsetY = (height * (1 - aggressiveScaleFactor)) / 2;
       page.translateContent(offsetX, offsetY);
       
+      // Apply image quality reduction based on the imageQuality parameter
+      // Note: pdf-lib doesn't directly support image quality reduction,
+      // but in a real implementation, this would involve:
+      // 1. Extracting images from the PDF
+      // 2. Recompressing them at lower quality
+      // 3. Replacing the original images
+      
       ultraCompressed.addPage(page);
     });
     
@@ -272,6 +283,48 @@ export class PdfProcessor {
     };
     
     return await ultraCompressed.save(maxCompressionOptions);
+  }
+
+  async rotatePdf(
+    file: File, 
+    pages: number[], 
+    angle: 90 | 180 | 270, 
+    direction: 'clockwise' | 'counterclockwise' = 'clockwise'
+  ): Promise<Uint8Array> {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const pageCount = pdfDoc.getPageCount();
+      
+      // Validate pages
+      pages = pages.filter(p => p >= 1 && p <= pageCount);
+      
+      if (pages.length === 0) {
+        throw new Error('No valid pages to rotate');
+      }
+      
+      // Calculate actual rotation angle
+      let rotationAngle = direction === 'clockwise' ? angle : (360 - angle);
+      
+      // Apply rotation to each page
+      pages.forEach(pageNum => {
+        const pageIndex = pageNum - 1; // Convert to 0-based index
+        const page = pdfDoc.getPage(pageIndex);
+        
+        // Get current rotation and add new rotation
+        const currentRotation = page.getRotation().angle;
+        const newRotation = (currentRotation + rotationAngle) % 360;
+        
+        // Apply rotation
+        page.setRotation(degrees(newRotation));
+      });
+      
+      // Save the rotated PDF
+      return await pdfDoc.save();
+    } catch (error) {
+      console.error('Error rotating PDF:', error);
+      throw new Error('Failed to rotate PDF. Please ensure the file is a valid PDF document.');
+    }
   }
 
   async convertPdfToWord(file: File): Promise<Uint8Array> {
@@ -398,6 +451,14 @@ export class PdfProcessor {
   <Paragraphs>0</Paragraphs>
 </Properties>`);
 
+      // Extract text from each page
+      const extractedText: string[] = [];
+      for (let i = 0; i < pageCount; i++) {
+        // In a real implementation, we would extract text from each page
+        // For this demo, we'll create placeholder text
+        extractedText.push(`Content from page ${i + 1} of the PDF document.`);
+      }
+
       // Create the main document content
       const documentContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
@@ -434,7 +495,7 @@ export class PdfProcessor {
         <w:t xml:space="preserve"></w:t>
       </w:r>
     </w:p>
-    ${Array.from({ length: pageCount }, (_, i) => `
+    ${extractedText.map((text, i) => `
     <w:p>
       <w:pPr>
         <w:pStyle w:val="Heading1"/>
@@ -445,40 +506,7 @@ export class PdfProcessor {
     </w:p>
     <w:p>
       <w:r>
-        <w:t>This section contains the extracted content from page ${i + 1} of the original PDF document.</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:r>
-        <w:t xml:space="preserve"></w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:r>
-        <w:rPr>
-          <w:b/>
-        </w:rPr>
-        <w:t>Key Features Preserved:</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:r>
-        <w:t>• Text content with original formatting</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:r>
-        <w:t>• Tables converted to Word table format</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:r>
-        <w:t>• Images positioned appropriately</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:r>
-        <w:t>• Font styles and sizes maintained</w:t>
+        <w:t>${text}</w:t>
       </w:r>
     </w:p>
     <w:p>
