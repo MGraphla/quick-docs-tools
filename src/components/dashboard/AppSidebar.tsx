@@ -16,7 +16,9 @@ import {
   Signature,
   Home,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Minimize2,
+  FileType
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -31,13 +33,12 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const pdfTools = [
   { name: "Merge PDF", path: "/dashboard/merge-pdf", icon: FileText },
   { name: "Split PDF", path: "/dashboard/split-pdf", icon: Scissors },
-  { name: "Compress PDF", path: "/dashboard/compress-pdf", icon: Archive },
+  { name: "Compress PDF", path: "/dashboard/compress-pdf", icon: Minimize2 },
   { name: "PDF to Word", path: "/dashboard/pdf-to-word", icon: FileDown },
   { name: "PDF to PowerPoint", path: "/dashboard/pdf-to-powerpoint", icon: FileDown },
   { name: "PDF to Excel", path: "/dashboard/pdf-to-excel", icon: FileDown },
@@ -71,29 +72,41 @@ export function AppSidebar() {
   const isCollapsed = state === "collapsed";
 
   return (
-    <Sidebar className={isCollapsed ? "w-14" : "w-64"} collapsible="icon">
-      <SidebarHeader className="border-b p-4">
+    <Sidebar className={isCollapsed ? "w-14" : "w-72"} collapsible="icon">
+      <SidebarHeader className="border-b bg-white/50 backdrop-blur-sm p-6">
         {!isCollapsed && (
-          <div className="flex items-center space-x-2">
-            <FileText className="h-8 w-8 text-blue-600" />
-            <span className="text-xl font-bold">QuickDocs</span>
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
+              <FileText className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                QuickDocs
+              </span>
+              <p className="text-xs text-gray-500 font-medium">Document Tools</p>
+            </div>
           </div>
         )}
         {isCollapsed && (
-          <FileText className="h-8 w-8 text-blue-600 mx-auto" />
+          <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl mx-auto">
+            <FileText className="h-6 w-6 text-white" />
+          </div>
         )}
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="bg-white/30 backdrop-blur-sm">
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton 
                 onClick={() => navigate('/dashboard')}
                 isActive={isActive('/dashboard')}
+                className="hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 data-[active=true]:bg-gradient-to-r data-[active=true]:from-blue-500 data-[active=true]:to-purple-600 data-[active=true]:text-white"
               >
-                <Home className="h-4 w-4" />
-                {!isCollapsed && <span>Dashboard</span>}
+                <div className="p-1.5 rounded-lg bg-blue-100 data-[active=true]:bg-white/20">
+                  <Home className="h-4 w-4" />
+                </div>
+                {!isCollapsed && <span className="font-medium">Dashboard</span>}
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -104,8 +117,13 @@ export function AppSidebar() {
             <SidebarGroup>
               <Collapsible open={pdfToolsOpen} onOpenChange={setPdfToolsOpen}>
                 <CollapsibleTrigger asChild>
-                  <SidebarGroupLabel className="flex items-center justify-between cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-md px-2 py-1">
-                    <span>PDF Tools</span>
+                  <SidebarGroupLabel className="flex items-center justify-between cursor-pointer hover:bg-blue-50 hover:text-blue-700 rounded-lg px-3 py-2 transition-all duration-200">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded bg-red-100">
+                        <FileText className="h-3 w-3 text-red-600" />
+                      </div>
+                      <span className="font-semibold">PDF Tools</span>
+                    </div>
                     {pdfToolsOpen ? (
                       <ChevronDown className="h-4 w-4" />
                     ) : (
@@ -121,9 +139,12 @@ export function AppSidebar() {
                           <SidebarMenuButton 
                             onClick={() => navigate(tool.path)}
                             isActive={isActive(tool.path)}
+                            className="hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 data-[active=true]:bg-gradient-to-r data-[active=true]:from-blue-500 data-[active=true]:to-purple-600 data-[active=true]:text-white ml-2"
                           >
-                            <tool.icon className="h-4 w-4" />
-                            <span>{tool.name}</span>
+                            <div className="p-1.5 rounded-lg bg-gray-100 data-[active=true]:bg-white/20">
+                              <tool.icon className="h-4 w-4" />
+                            </div>
+                            <span className="font-medium">{tool.name}</span>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                       ))}
@@ -136,8 +157,13 @@ export function AppSidebar() {
             <SidebarGroup>
               <Collapsible open={productivityToolsOpen} onOpenChange={setProductivityToolsOpen}>
                 <CollapsibleTrigger asChild>
-                  <SidebarGroupLabel className="flex items-center justify-between cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-md px-2 py-1">
-                    <span>Productivity Tools</span>
+                  <SidebarGroupLabel className="flex items-center justify-between cursor-pointer hover:bg-green-50 hover:text-green-700 rounded-lg px-3 py-2 transition-all duration-200">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded bg-green-100">
+                        <QrCode className="h-3 w-3 text-green-600" />
+                      </div>
+                      <span className="font-semibold">Productivity Tools</span>
+                    </div>
                     {productivityToolsOpen ? (
                       <ChevronDown className="h-4 w-4" />
                     ) : (
@@ -153,9 +179,12 @@ export function AppSidebar() {
                           <SidebarMenuButton 
                             onClick={() => navigate(tool.path)}
                             isActive={isActive(tool.path)}
+                            className="hover:bg-green-50 hover:text-green-700 transition-all duration-200 data-[active=true]:bg-gradient-to-r data-[active=true]:from-green-500 data-[active=true]:to-teal-600 data-[active=true]:text-white ml-2"
                           >
-                            <tool.icon className="h-4 w-4" />
-                            <span>{tool.name}</span>
+                            <div className="p-1.5 rounded-lg bg-gray-100 data-[active=true]:bg-white/20">
+                              <tool.icon className="h-4 w-4" />
+                            </div>
+                            <span className="font-medium">{tool.name}</span>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                       ))}
