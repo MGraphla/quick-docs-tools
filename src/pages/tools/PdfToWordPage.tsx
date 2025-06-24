@@ -118,47 +118,40 @@ const PdfToWordPage = () => {
     try {
       const converted: ConvertedFile[] = [];
       
-      const steps = [
-        { message: "Analyzing PDF structure...", progress: 20 },
-        { message: "Extracting text and formatting...", progress: 40 },
-        { message: "Processing images and graphics...", progress: 60 },
-        { message: "Converting to Word format...", progress: 80 },
-        { message: "Optimizing document...", progress: 95 }
-      ];
-
-      for (const step of steps) {
-        setProgressMessage(step.message);
-        setProgress(step.progress);
-        await new Promise(resolve => setTimeout(resolve, 600));
-      }
-
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setProgress(((i + 1) / files.length) * 100);
         setProgressMessage(`Converting ${file.file.name}...`);
         
-        // Perform actual PDF to Word conversion
-        const convertedBytes = await pdfProcessor.convertPdfToWord(file.file);
-        
-        // Create a proper Word document file
-        const fileName = file.file.name.replace(/\.pdf$/i, '.docx');
-        const url = URL.createObjectURL(new Blob([convertedBytes], { 
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-        }));
-        
-        converted.push({
-          name: fileName,
-          url,
-          size: formatFileSize(convertedBytes.length),
-          bytes: convertedBytes,
-          pages: file.info?.pageCount || 0
-        });
+        try {
+          // Perform actual PDF to Word conversion
+          const convertedBytes = await pdfProcessor.convertPdfToWord(file.file);
+          
+          // Create a proper Word document file
+          const fileName = file.file.name.replace(/\.pdf$/i, '.docx');
+          const url = URL.createObjectURL(new Blob([convertedBytes], { 
+            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+          }));
+          
+          converted.push({
+            name: fileName,
+            url,
+            size: formatFileSize(convertedBytes.length),
+            bytes: convertedBytes,
+            pages: file.info?.pageCount || 0
+          });
+        } catch (error) {
+          console.error(`Error converting ${file.file.name}:`, error);
+          toast.error(`Failed to convert ${file.file.name}`);
+        }
       }
       
-      setConvertedFiles(converted);
-      setProgress(100);
-      setProgressMessage("Conversion completed!");
-      toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to Word format`);
+      if (converted.length > 0) {
+        setConvertedFiles(converted);
+        setProgress(100);
+        setProgressMessage("Conversion completed!");
+        toast.success(`Successfully converted ${converted.length} PDF file${converted.length > 1 ? 's' : ''} to Word format`);
+      }
       
     } catch (error) {
       console.error('Conversion error:', error);

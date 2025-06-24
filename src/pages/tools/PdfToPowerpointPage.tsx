@@ -118,47 +118,40 @@ const PdfToPowerpointPage = () => {
     try {
       const converted: ConvertedFile[] = [];
       
-      const steps = [
-        { message: "Analyzing PDF layout...", progress: 20 },
-        { message: "Extracting content and images...", progress: 40 },
-        { message: "Creating presentation slides...", progress: 60 },
-        { message: "Applying slide layouts...", progress: 80 },
-        { message: "Finalizing presentation...", progress: 95 }
-      ];
-
-      for (const step of steps) {
-        setProgressMessage(step.message);
-        setProgress(step.progress);
-        await new Promise(resolve => setTimeout(resolve, 600));
-      }
-
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setProgress(((i + 1) / files.length) * 100);
         setProgressMessage(`Converting ${file.file.name}...`);
         
-        // Perform actual PDF to PowerPoint conversion
-        const convertedBytes = await pdfProcessor.convertPdfToPowerpoint(file.file);
-        
-        // Create a proper PowerPoint file
-        const fileName = file.file.name.replace(/\.pdf$/i, '.pptx');
-        const url = URL.createObjectURL(new Blob([convertedBytes], { 
-          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
-        }));
-        
-        converted.push({
-          name: fileName,
-          url,
-          size: formatFileSize(convertedBytes.length),
-          bytes: convertedBytes,
-          pages: file.info?.pageCount || 0
-        });
+        try {
+          // Perform actual PDF to PowerPoint conversion
+          const convertedBytes = await pdfProcessor.convertPdfToPowerpoint(file.file);
+          
+          // Create a proper PowerPoint file
+          const fileName = file.file.name.replace(/\.pdf$/i, '.pptx');
+          const url = URL.createObjectURL(new Blob([convertedBytes], { 
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
+          }));
+          
+          converted.push({
+            name: fileName,
+            url,
+            size: formatFileSize(convertedBytes.length),
+            bytes: convertedBytes,
+            pages: file.info?.pageCount || 0
+          });
+        } catch (error) {
+          console.error(`Error converting ${file.file.name}:`, error);
+          toast.error(`Failed to convert ${file.file.name}`);
+        }
       }
       
-      setConvertedFiles(converted);
-      setProgress(100);
-      setProgressMessage("Conversion completed!");
-      toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to PowerPoint format`);
+      if (converted.length > 0) {
+        setConvertedFiles(converted);
+        setProgress(100);
+        setProgressMessage("Conversion completed!");
+        toast.success(`Successfully converted ${converted.length} PDF file${converted.length > 1 ? 's' : ''} to PowerPoint format`);
+      }
       
     } catch (error) {
       console.error('Conversion error:', error);
