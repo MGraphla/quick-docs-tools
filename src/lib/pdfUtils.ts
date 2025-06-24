@@ -119,28 +119,40 @@ export function createPdfProcessor() {
         fullText += pageText + '\n\n';
       }
 
-      // Create a simple HTML structure that can be converted to DOCX
-      const htmlContent = `
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <title>Converted Document</title>
-          </head>
-          <body>
-            <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-              ${fullText.split('\n\n').map(paragraph => 
-                paragraph.trim() ? `<p>${paragraph.trim()}</p>` : ''
-              ).join('')}
-            </div>
-          </body>
-        </html>
-      `;
-
-      // Convert HTML to DOCX using html-docx-js
-      const { default: htmlDocx } = await import('html-docx-js/dist/html-docx');
-      const docxBlob = htmlDocx.asBlob(htmlContent);
+      // Create a basic DOCX structure using JSZip
+      const zip = new JSZip();
       
-      return new Uint8Array(await docxBlob.arrayBuffer());
+      // Add basic DOCX structure
+      zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-wordprocessingml.document.main+xml"/>
+</Types>`);
+
+      zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`);
+
+      zip.file('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`);
+
+      // Create the main document with the extracted text
+      const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    ${fullText.split('\n\n').map(paragraph => 
+      paragraph.trim() ? `<w:p><w:r><w:t>${paragraph.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t></w:r></w:p>` : ''
+    ).join('')}
+  </w:body>
+</w:document>`;
+
+      zip.file('word/document.xml', documentXml);
+
+      const docxBlob = await zip.generateAsync({ type: 'uint8array' });
+      return docxBlob;
     },
 
     async convertPdfToPowerpoint(file: File): Promise<Uint8Array> {
