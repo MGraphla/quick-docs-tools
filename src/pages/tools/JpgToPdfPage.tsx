@@ -165,14 +165,15 @@ const JpgToPdfPage = () => {
       }
 
       // Create PDF using jsPDF
-      const pdf = new (await import('jspdf')).default();
+      const jsPDF = (await import('jspdf')).default;
+      const pdf = new jsPDF();
       
       // Configure page settings based on user preferences
       const pageFormat = pageSize.toUpperCase() as any;
       const orientation = pageOrientation === 'landscape' ? 'l' : 'p';
       
       // Recreate PDF with proper settings
-      const finalPdf = new (await import('jspdf')).default({
+      const finalPdf = new jsPDF({
         orientation,
         unit: 'mm',
         format: pageFormat

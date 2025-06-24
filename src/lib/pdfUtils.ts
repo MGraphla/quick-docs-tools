@@ -194,7 +194,7 @@ export function createPdfProcessor() {
           <a:stretch>
             <a:fillRect/>
           </a:stretch>
-        </a:blipFill>
+        </p:blipFill>
         <p:spPr>
           <a:xfrm xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
             <a:off x="0" y="0"/>
