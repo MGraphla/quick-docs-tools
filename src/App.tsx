@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +13,7 @@ import LinkShortenerPage from "./pages/tools/LinkShortenerPage";
 import AudioToTextPage from "./pages/tools/AudioToTextPage";
 import LiveTranscriptionPage from "./pages/tools/LiveTranscriptionPage";
 import ProtectPdfPage from "./pages/tools/ProtectPdfPage";
+import UnlockPdfPage from "./pages/tools/UnlockPdfPage";
 import RotatePdfPage from "./pages/tools/RotatePdfPage";
 import WatermarkPdfPage from "./pages/tools/WatermarkPdfPage";
 import SignPdfPage from "./pages/tools/SignPdfPage";
@@ -44,6 +46,7 @@ const App = () => (
           <Route path="/dashboard/audio-to-text" element={<Dashboard><AudioToTextPage /></Dashboard>} />
           <Route path="/dashboard/live-transcription" element={<Dashboard><LiveTranscriptionPage /></Dashboard>} />
           <Route path="/dashboard/protect-pdf" element={<Dashboard><ProtectPdfPage /></Dashboard>} />
+          <Route path="/dashboard/unlock-pdf" element={<Dashboard><UnlockPdfPage /></Dashboard>} />
           <Route path="/dashboard/rotate-pdf" element={<Dashboard><RotatePdfPage /></Dashboard>} />
           <Route path="/dashboard/watermark-pdf" element={<Dashboard><WatermarkPdfPage /></Dashboard>} />
           <Route path="/dashboard/sign-pdf" element={<Dashboard><SignPdfPage /></Dashboard>} />

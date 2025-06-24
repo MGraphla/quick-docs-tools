@@ -21,6 +21,11 @@ export interface PdfInfo {
   modificationDate?: Date;
 }
 
+export interface PageRange {
+  start: number;
+  end: number;
+}
+
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -29,27 +34,25 @@ export function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-export function parsePageRanges(ranges: string, totalPages: number): number[] {
-  const pages: number[] = [];
+export function parsePageRanges(ranges: string, totalPages: number): PageRange[] {
+  const pageRanges: PageRange[] = [];
   const parts = ranges.split(',').map(part => part.trim());
   
   for (const part of parts) {
     if (part.includes('-')) {
       const [start, end] = part.split('-').map(num => parseInt(num.trim()));
       if (start && end && start <= totalPages && end <= totalPages && start <= end) {
-        for (let i = start; i <= end; i++) {
-          if (!pages.includes(i)) pages.push(i);
-        }
+        pageRanges.push({ start, end });
       }
     } else {
       const pageNum = parseInt(part);
-      if (pageNum && pageNum <= totalPages && !pages.includes(pageNum)) {
-        pages.push(pageNum);
+      if (pageNum && pageNum <= totalPages) {
+        pageRanges.push({ start: pageNum, end: pageNum });
       }
     }
   }
   
-  return pages.sort((a, b) => a - b);
+  return pageRanges;
 }
 
 export function createPdfProcessor() {
@@ -290,15 +293,21 @@ export function createPdfProcessor() {
       return await mergedPdf.save();
     },
 
-    async splitPdf(file: File, pageRanges: number[]): Promise<Uint8Array[]> {
+    async splitPdf(file: File, pageRanges: PageRange[]): Promise<Uint8Array[]> {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await PDFDocument.load(arrayBuffer);
       const results: Uint8Array[] = [];
       
-      for (const pageNum of pageRanges) {
+      for (const range of pageRanges) {
         const newPdf = await PDFDocument.create();
-        const [page] = await newPdf.copyPages(pdf, [pageNum - 1]);
-        newPdf.addPage(page);
+        const pageIndices = [];
+        
+        for (let i = range.start - 1; i < range.end; i++) {
+          pageIndices.push(i);
+        }
+        
+        const pages = await newPdf.copyPages(pdf, pageIndices);
+        pages.forEach(page => newPdf.addPage(page));
         
         const pdfBytes = await newPdf.save();
         results.push(pdfBytes);
@@ -312,6 +321,227 @@ export function createPdfProcessor() {
       const pdf = await PDFDocument.load(arrayBuffer);
       
       // Basic compression by re-saving
+      return await pdf.save();
+    },
+
+    async protectPdf(file: File, password: string): Promise<Uint8Array> {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await PDFDocument.load(arrayBuffer);
+      
+      // Set password protection
+      const pdfBytes = await pdf.save({
+        userPassword: password,
+        ownerPassword: password + '_owner',
+        permissions: {
+          printing: 'highResolution',
+          modifying: false,
+          copying: false,
+          annotating: false,
+          fillingForms: false,
+          contentAccessibility: false,
+          documentAssembly: false
+        }
+      });
+      
+      return pdfBytes;
+    },
+
+    async unlockPdf(file: File, password: string): Promise<Uint8Array> {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await PDFDocument.load(arrayBuffer, { password });
+        
+        // Save without password protection
+        const pdfBytes = await pdf.save();
+        return pdfBytes;
+      } catch (error) {
+        throw new Error('Invalid password or corrupted PDF');
+      }
+    },
+
+    async addWatermark(file: File, watermarkOptions: {
+      type: 'text' | 'image';
+      text?: string;
+      imageData?: string;
+      position: string;
+      opacity: number;
+      rotation: number;
+      fontSize?: number;
+      color?: string;
+      pages?: string;
+    }): Promise<Uint8Array> {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await PDFDocument.load(arrayBuffer);
+      
+      const pages = pdf.getPages();
+      const { type, text, imageData, position, opacity, rotation, fontSize = 24, color = '#000000' } = watermarkOptions;
+      
+      for (const page of pages) {
+        const { width, height } = page.getSize();
+        
+        if (type === 'text' && text) {
+          const font = await pdf.embedFont(StandardFonts.Helvetica);
+          const textWidth = font.widthOfTextAtSize(text, fontSize);
+          const textHeight = fontSize;
+          
+          let x = width / 2 - textWidth / 2;
+          let y = height / 2 - textHeight / 2;
+          
+          // Adjust position based on user selection
+          switch (position) {
+            case 'top-left':
+              x = 50;
+              y = height - 50;
+              break;
+            case 'top-right':
+              x = width - textWidth - 50;
+              y = height - 50;
+              break;
+            case 'bottom-left':
+              x = 50;
+              y = 50;
+              break;
+            case 'bottom-right':
+              x = width - textWidth - 50;
+              y = 50;
+              break;
+            case 'center':
+            default:
+              // Already set above
+              break;
+          }
+          
+          page.drawText(text, {
+            x,
+            y,
+            size: fontSize,
+            font,
+            color: rgb(
+              parseInt(color.slice(1, 3), 16) / 255,
+              parseInt(color.slice(3, 5), 16) / 255,
+              parseInt(color.slice(5, 7), 16) / 255
+            ),
+            opacity: opacity / 100,
+            rotate: { angle: rotation * (Math.PI / 180) }
+          });
+        }
+        
+        if (type === 'image' && imageData) {
+          try {
+            const imageBytes = Uint8Array.from(atob(imageData.split(',')[1]), c => c.charCodeAt(0));
+            let embeddedImage;
+            
+            if (imageData.includes('data:image/png')) {
+              embeddedImage = await pdf.embedPng(imageBytes);
+            } else {
+              embeddedImage = await pdf.embedJpg(imageBytes);
+            }
+            
+            const imageDims = embeddedImage.scale(0.3);
+            
+            let x = width / 2 - imageDims.width / 2;
+            let y = height / 2 - imageDims.height / 2;
+            
+            // Adjust position
+            switch (position) {
+              case 'top-left':
+                x = 50;
+                y = height - imageDims.height - 50;
+                break;
+              case 'top-right':
+                x = width - imageDims.width - 50;
+                y = height - imageDims.height - 50;
+                break;
+              case 'bottom-left':
+                x = 50;
+                y = 50;
+                break;
+              case 'bottom-right':
+                x = width - imageDims.width - 50;
+                y = 50;
+                break;
+            }
+            
+            page.drawImage(embeddedImage, {
+              x,
+              y,
+              width: imageDims.width,
+              height: imageDims.height,
+              opacity: opacity / 100,
+              rotate: { angle: rotation * (Math.PI / 180) }
+            });
+          } catch (error) {
+            console.error('Error embedding image:', error);
+          }
+        }
+      }
+      
+      return await pdf.save();
+    },
+
+    async addSignature(file: File, signatureOptions: {
+      type: 'draw' | 'text' | 'image';
+      signatureData: string;
+      x: number;
+      y: number;
+      width?: number;
+      height?: number;
+      pageNumber: number;
+      text?: string;
+      fontSize?: number;
+      color?: string;
+    }): Promise<Uint8Array> {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await PDFDocument.load(arrayBuffer);
+      
+      const pages = pdf.getPages();
+      const page = pages[signatureOptions.pageNumber - 1];
+      
+      if (!page) {
+        throw new Error('Invalid page number');
+      }
+      
+      const { type, signatureData, x, y, width = 150, height = 50, text, fontSize = 24, color = '#000000' } = signatureOptions;
+      
+      if (type === 'text' && text) {
+        const font = await pdf.embedFont(StandardFonts.Helvetica);
+        
+        page.drawText(text, {
+          x,
+          y: page.getHeight() - y - fontSize, // Flip Y coordinate
+          size: fontSize,
+          font,
+          color: rgb(
+            parseInt(color.slice(1, 3), 16) / 255,
+            parseInt(color.slice(3, 5), 16) / 255,
+            parseInt(color.slice(5, 7), 16) / 255
+          )
+        });
+      }
+      
+      if ((type === 'draw' || type === 'image') && signatureData) {
+        try {
+          const imageBytes = Uint8Array.from(atob(signatureData.split(',')[1]), c => c.charCodeAt(0));
+          let embeddedImage;
+          
+          if (signatureData.includes('data:image/png')) {
+            embeddedImage = await pdf.embedPng(imageBytes);
+          } else {
+            embeddedImage = await pdf.embedJpg(imageBytes);
+          }
+          
+          page.drawImage(embeddedImage, {
+            x,
+            y: page.getHeight() - y - height, // Flip Y coordinate
+            width,
+            height
+          });
+        } catch (error) {
+          console.error('Error embedding signature image:', error);
+          throw new Error('Failed to add signature');
+        }
+      }
+      
       return await pdf.save();
     },
 
