@@ -164,10 +164,65 @@ const JpgToPdfPage = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // Simulate PDF creation
-      const pdfContent = `Converted from ${images.length} images`;
-      const blob = new Blob([pdfContent], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
+      // Create PDF using jsPDF
+      const pdf = new (await import('jspdf')).default();
+      
+      // Configure page settings based on user preferences
+      const pageFormat = pageSize.toUpperCase() as any;
+      const orientation = pageOrientation === 'landscape' ? 'l' : 'p';
+      
+      // Recreate PDF with proper settings
+      const finalPdf = new (await import('jspdf')).default({
+        orientation,
+        unit: 'mm',
+        format: pageFormat
+      });
+
+      const marginNum = parseInt(margin);
+      const pageWidth = finalPdf.internal.pageSize.getWidth();
+      const pageHeight = finalPdf.internal.pageSize.getHeight();
+      const usableWidth = pageWidth - (marginNum * 2);
+      const usableHeight = pageHeight - (marginNum * 2);
+
+      // Add images to PDF
+      for (let i = 0; i < images.length; i++) {
+        if (i > 0) finalPdf.addPage();
+        
+        const image = images[i];
+        const imgData = image.preview;
+        
+        // Calculate image dimensions to fit page
+        const aspectRatio = (image.width || 1) / (image.height || 1);
+        let imgWidth = usableWidth;
+        let imgHeight = usableWidth / aspectRatio;
+        
+        if (imgHeight > usableHeight) {
+          imgHeight = usableHeight;
+          imgWidth = usableHeight * aspectRatio;
+        }
+        
+        // Center the image on the page
+        const x = marginNum + (usableWidth - imgWidth) / 2;
+        const y = marginNum + (usableHeight - imgHeight) / 2;
+        
+        try {
+          finalPdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
+        } catch (error) {
+          console.warn(`Failed to add image ${i + 1}:`, error);
+        }
+      }
+
+      // Add metadata if title is provided
+      if (pdfTitle) {
+        finalPdf.setProperties({
+          title: pdfTitle,
+          creator: 'PDF Converter',
+          author: 'User'
+        });
+      }
+
+      const pdfBlob = finalPdf.output('blob');
+      const url = URL.createObjectURL(pdfBlob);
       
       const fileName = pdfTitle 
         ? `${pdfTitle}.pdf` 
@@ -176,7 +231,7 @@ const JpgToPdfPage = () => {
       setConvertedFile({
         name: fileName,
         url,
-        size: formatFileSize(blob.size),
+        size: formatFileSize(pdfBlob.size),
         pages: images.length
       });
       

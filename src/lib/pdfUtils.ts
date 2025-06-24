@@ -29,6 +29,29 @@ export function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+export function parsePageRanges(ranges: string, totalPages: number): number[] {
+  const pages: number[] = [];
+  const parts = ranges.split(',').map(part => part.trim());
+  
+  for (const part of parts) {
+    if (part.includes('-')) {
+      const [start, end] = part.split('-').map(num => parseInt(num.trim()));
+      if (start && end && start <= totalPages && end <= totalPages && start <= end) {
+        for (let i = start; i <= end; i++) {
+          if (!pages.includes(i)) pages.push(i);
+        }
+      }
+    } else {
+      const pageNum = parseInt(part);
+      if (pageNum && pageNum <= totalPages && !pages.includes(pageNum)) {
+        pages.push(pageNum);
+      }
+    }
+  }
+  
+  return pages.sort((a, b) => a - b);
+}
+
 export function createPdfProcessor() {
   return {
     async loadPdf(file: File): Promise<PdfInfo> {
@@ -36,17 +59,18 @@ export function createPdfProcessor() {
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       
       const metadata = await pdf.getMetadata();
+      const info = metadata.info as any;
       
       return {
         pageCount: pdf.numPages,
-        title: metadata.info?.Title,
-        author: metadata.info?.Author,
-        subject: metadata.info?.Subject,
-        keywords: metadata.info?.Keywords,
-        creator: metadata.info?.Creator,
-        producer: metadata.info?.Producer,
-        creationDate: metadata.info?.CreationDate,
-        modificationDate: metadata.info?.ModDate,
+        title: info?.Title,
+        author: info?.Author,
+        subject: info?.Subject,
+        keywords: info?.Keywords,
+        creator: info?.Creator,
+        producer: info?.Producer,
+        creationDate: info?.CreationDate,
+        modificationDate: info?.ModDate,
       };
     },
 
@@ -170,7 +194,7 @@ export function createPdfProcessor() {
           <a:stretch>
             <a:fillRect/>
           </a:stretch>
-        </p:blipFill>
+        </a:blipFill>
         <p:spPr>
           <a:xfrm xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
             <a:off x="0" y="0"/>
@@ -227,6 +251,73 @@ export function createPdfProcessor() {
       } catch (error) {
         throw new Error('Failed to convert Word document to PDF');
       }
+    },
+
+    async convertPdfToExcel(file: File): Promise<Uint8Array> {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      let csvContent = '';
+      
+      // Extract text from each page and format as CSV
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(',');
+        
+        csvContent += pageText + '\n';
+      }
+
+      // Convert CSV to Excel-like format (simplified)
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      return new Uint8Array(await blob.arrayBuffer());
+    },
+
+    async mergePdfs(files: File[]): Promise<Uint8Array> {
+      const mergedPdf = await PDFDocument.create();
+      
+      for (const file of files) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await PDFDocument.load(arrayBuffer);
+        const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+        
+        pages.forEach((page) => mergedPdf.addPage(page));
+      }
+      
+      return await mergedPdf.save();
+    },
+
+    async splitPdf(file: File, pageRanges: number[]): Promise<Uint8Array[]> {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await PDFDocument.load(arrayBuffer);
+      const results: Uint8Array[] = [];
+      
+      for (const pageNum of pageRanges) {
+        const newPdf = await PDFDocument.create();
+        const [page] = await newPdf.copyPages(pdf, [pageNum - 1]);
+        newPdf.addPage(page);
+        
+        const pdfBytes = await newPdf.save();
+        results.push(pdfBytes);
+      }
+      
+      return results;
+    },
+
+    async compressPdf(file: File): Promise<Uint8Array> {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await PDFDocument.load(arrayBuffer);
+      
+      // Basic compression by re-saving
+      return await pdf.save();
+    },
+
+    createDownloadLink(data: Uint8Array, filename: string): string {
+      const blob = new Blob([data], { type: 'application/pdf' });
+      return URL.createObjectURL(blob);
     }
   };
 }
