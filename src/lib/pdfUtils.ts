@@ -1,3 +1,4 @@
+
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument, rgb, StandardFonts, degrees, PDFFont, PDFPage } from 'pdf-lib';
 import JSZip from 'jszip';
@@ -134,7 +135,7 @@ export function createPdfProcessor() {
       // Add metadata to indicate protection (simulated encryption for demo)
       pdfDoc.setTitle(`Protected: ${file.name}`);
       pdfDoc.setSubject('This document is password protected');
-      pdfDoc.setKeywords(`password-protected,${password.length}-char-password`);
+      pdfDoc.setKeywords([`password-protected`, `${password.length}-char-password`]);
       
       // Store encrypted password hash in metadata
       const encoder = new TextEncoder();
