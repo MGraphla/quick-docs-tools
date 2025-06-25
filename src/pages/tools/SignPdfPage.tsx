@@ -16,9 +16,10 @@ import { saveAs } from "file-saver";
 import SignatureCanvas from "react-signature-canvas";
 import Draggable from "react-draggable";
 import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
 // Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface SignedFile {
   name: string;
