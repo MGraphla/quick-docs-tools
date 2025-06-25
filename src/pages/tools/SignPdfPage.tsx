@@ -16,7 +16,7 @@ import { saveAs } from "file-saver";
 import SignatureCanvas from "react-signature-canvas";
 import Draggable from "react-draggable";
 import * as pdfjsLib from "pdfjs-dist";
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 // Set up PDF.js worker with local bundle
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
