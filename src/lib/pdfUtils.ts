@@ -5,11 +5,8 @@ import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
 
-// Set up PDF.js worker using the bundled worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url
-).href;
+// Set up PDF.js worker using CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js';
 
 export interface PdfInfo {
   pageCount: number;
@@ -122,7 +119,7 @@ export function createPdfProcessor() {
       // Add metadata to indicate protection (simulated encryption for demo)
       pdfDoc.setTitle(`Protected: ${file.name}`);
       pdfDoc.setSubject('This document is password protected');
-      pdfDoc.setKeywords([`password-protected`, `${password.length}-char-password`]);
+      pdfDoc.setKeywords(['password-protected', `${password.length}-char-password`]);
       
       // Store encrypted password hash in metadata
       const encoder = new TextEncoder();
@@ -375,7 +372,7 @@ export function createPdfProcessor() {
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
     ${fullText.split('\n\n').map(paragraph => 
-      paragraph.trim() ? `<w:p><w:r><w:t>${paragraph.trim().replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>')}</w:t></w:r></w:p>` : ''
+      paragraph.trim() ? `<w:p><w:r><w:t>${paragraph.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t></w:r></w:p>` : ''
     ).join('')}
   </w:body>
 </w:document>`;
