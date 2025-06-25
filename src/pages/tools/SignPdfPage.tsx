@@ -16,9 +16,10 @@ import { saveAs } from "file-saver";
 import SignatureCanvas from "react-signature-canvas";
 import Draggable from "react-draggable";
 import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
 // Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface SignedFile {
   name: string;
@@ -234,7 +235,7 @@ const SignPdfPage = () => {
       } else {
         toast.error("Please draw your signature first");
       }
-    } else if (signatureType === "text") {
+    } else if (signatureType === "type") {
       if (typedSignature.trim()) {
         setSignatureState(prev => ({
           ...prev,
@@ -270,7 +271,7 @@ const SignPdfPage = () => {
   };
 
   useEffect(() => {
-    if (signatureType === "text") {
+    if (signatureType === "type") {
       updateTypedSignature();
     }
   }, [typedSignature, typedSignatureFont, typedSignatureSize, typedSignatureColor]);
