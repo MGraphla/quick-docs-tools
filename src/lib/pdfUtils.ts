@@ -1,4 +1,3 @@
-
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument, rgb, StandardFonts, degrees, PDFFont, PDFPage } from 'pdf-lib';
 import JSZip from 'jszip';
@@ -57,18 +56,6 @@ export function parsePageRanges(ranges: string, totalPages: number): PageRange[]
   }
   
   return pageRanges;
-}
-
-// Convert canvas to Uint8Array for PDF embedding
-async function canvasToUint8Array(canvas: HTMLCanvasElement, format: 'png' | 'jpeg' = 'png'): Promise<Uint8Array> {
-  return new Promise((resolve) => {
-    canvas.toBlob(async (blob) => {
-      if (blob) {
-        const arrayBuffer = await blob.arrayBuffer();
-        resolve(new Uint8Array(arrayBuffer));
-      }
-    }, `image/${format}`);
-  });
 }
 
 export function createPdfProcessor() {
@@ -758,7 +745,9 @@ export function createPdfProcessor() {
       
       if (type === 'draw' && canvas) {
         try {
-          const imageBytes = await canvasToUint8Array(canvas, 'png');
+          // Convert canvas to image data without using the removed canvasToUint8Array function
+          const imageDataUrl = canvas.toDataURL('image/png');
+          const imageBytes = Uint8Array.from(atob(imageDataUrl.split(',')[1]), c => c.charCodeAt(0));
           const embeddedImage = await pdf.embedPng(imageBytes);
           
           page.drawImage(embeddedImage, {
