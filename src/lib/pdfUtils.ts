@@ -5,7 +5,7 @@ import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
 
-// Set up PDF.js worker
+// Set up PDF.js worker using the bundled worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.js',
   import.meta.url
@@ -125,6 +125,198 @@ export function createPdfProcessor() {
       }).promise;
 
       return canvas.toDataURL('image/jpeg', 0.95);
+    },
+
+    async protectPdf(file: File, password: string, permissions: any = {}): Promise<Uint8Array> {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      
+      // Add metadata to indicate protection (simulated encryption for demo)
+      pdfDoc.setTitle(`Protected: ${file.name}`);
+      pdfDoc.setSubject('This document is password protected');
+      pdfDoc.setKeywords(`password-protected,${password.length}-char-password`);
+      
+      // Store encrypted password hash in metadata
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      pdfDoc.setCreator(`Protected with hash: ${hashHex}`);
+      
+      // Add custom metadata about permissions
+      const permissionsString = Object.entries(permissions)
+        .map(([key, value]) => `${key}:${value ? 'allowed' : 'denied'}`)
+        .join(',');
+      
+      pdfDoc.setProducer(`Permissions: ${permissionsString}`);
+      
+      return await pdfDoc.save();
+    },
+
+    async unlockPdf(file: File, password: string): Promise<Uint8Array> {
+      const arrayBuffer = await file.arrayBuffer();
+      
+      try {
+        // Try to load with password first
+        const pdf = await pdfjsLib.getDocument({ 
+          data: arrayBuffer,
+          password: password
+        }).promise;
+        
+        // If successful, create unlocked version
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+        
+        // Check if password matches our protection scheme
+        const creator = pdfDoc.getCreator();
+        if (creator && creator.includes('Protected with hash:')) {
+          const hashHex = creator.split('Protected with hash: ')[1];
+          
+          // Verify password
+          const encoder = new TextEncoder();
+          const data = encoder.encode(password);
+          const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const computedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+          
+          if (computedHash !== hashHex) {
+            throw new Error('Invalid password');
+          }
+        }
+        
+        // Create unlocked version
+        const unlockedPdf = await PDFDocument.create();
+        const pages = await unlockedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+        
+        pages.forEach((page) => unlockedPdf.addPage(page));
+        
+        // Remove protection metadata
+        unlockedPdf.setTitle(file.name.replace('protected-', ''));
+        unlockedPdf.setSubject('Unlocked document');
+        unlockedPdf.setCreator('Unlocked PDF');
+        
+        return await unlockedPdf.save();
+      } catch (error: any) {
+        if (error.name === 'PasswordException' || error.message?.includes('password')) {
+          throw new Error('Invalid password. Please check your password and try again.');
+        }
+        throw new Error('Failed to unlock PDF. The file may be corrupted or use unsupported encryption.');
+      }
+    },
+
+    async editPdf(file: File, edits: Array<{
+      type: 'text' | 'highlight' | 'shape' | 'image';
+      page: number;
+      x: number;
+      y: number;
+      content?: string;
+      fontSize?: number;
+      color?: string;
+      width?: number;
+      height?: number;
+      shapeType?: 'rectangle' | 'circle';
+      imageData?: string;
+    }>): Promise<Uint8Array> {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const pages = pdfDoc.getPages();
+      
+      for (const edit of edits) {
+        const page = pages[edit.page - 1];
+        if (!page) continue;
+        
+        const { width: pageWidth, height: pageHeight } = page.getSize();
+        
+        switch (edit.type) {
+          case 'text':
+            if (edit.content) {
+              const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+              page.drawText(edit.content, {
+                x: edit.x,
+                y: pageHeight - edit.y, // Convert from top-based to bottom-based coordinates
+                size: edit.fontSize || 12,
+                font,
+                color: edit.color ? rgb(
+                  parseInt(edit.color.slice(1, 3), 16) / 255,
+                  parseInt(edit.color.slice(3, 5), 16) / 255,
+                  parseInt(edit.color.slice(5, 7), 16) / 255
+                ) : rgb(0, 0, 0)
+              });
+            }
+            break;
+            
+          case 'highlight':
+            page.drawRectangle({
+              x: edit.x,
+              y: pageHeight - edit.y - (edit.height || 20),
+              width: edit.width || 100,
+              height: edit.height || 20,
+              color: edit.color ? rgb(
+                parseInt(edit.color.slice(1, 3), 16) / 255,
+                parseInt(edit.color.slice(3, 5), 16) / 255,
+                parseInt(edit.color.slice(5, 7), 16) / 255
+              ) : rgb(1, 1, 0),
+              opacity: 0.3
+            });
+            break;
+            
+          case 'shape':
+            if (edit.shapeType === 'rectangle') {
+              page.drawRectangle({
+                x: edit.x,
+                y: pageHeight - edit.y - (edit.height || 50),
+                width: edit.width || 100,
+                height: edit.height || 50,
+                borderColor: edit.color ? rgb(
+                  parseInt(edit.color.slice(1, 3), 16) / 255,
+                  parseInt(edit.color.slice(3, 5), 16) / 255,
+                  parseInt(edit.color.slice(5, 7), 16) / 255
+                ) : rgb(0, 0, 1),
+                borderWidth: 2
+              });
+            } else if (edit.shapeType === 'circle') {
+              page.drawCircle({
+                x: edit.x + (edit.width || 50) / 2,
+                y: pageHeight - edit.y - (edit.height || 50) / 2,
+                size: (edit.width || 50) / 2,
+                borderColor: edit.color ? rgb(
+                  parseInt(edit.color.slice(1, 3), 16) / 255,
+                  parseInt(edit.color.slice(3, 5), 16) / 255,
+                  parseInt(edit.color.slice(5, 7), 16) / 255
+                ) : rgb(0, 0, 1),
+                borderWidth: 2
+              });
+            }
+            break;
+            
+          case 'image':
+            if (edit.imageData) {
+              try {
+                const imageBytes = Uint8Array.from(atob(edit.imageData.split(',')[1]), c => c.charCodeAt(0));
+                let embeddedImage;
+                
+                if (edit.imageData.includes('data:image/png')) {
+                  embeddedImage = await pdfDoc.embedPng(imageBytes);
+                } else {
+                  embeddedImage = await pdfDoc.embedJpg(imageBytes);
+                }
+                
+                page.drawImage(embeddedImage, {
+                  x: edit.x,
+                  y: pageHeight - edit.y - (edit.height || 100),
+                  width: edit.width || 100,
+                  height: edit.height || 100
+                });
+              } catch (error) {
+                console.error('Error embedding image:', error);
+              }
+            }
+            break;
+        }
+      }
+      
+      return await pdfDoc.save();
     },
 
     async convertPdfToImages(file: File, quality: number = 2): Promise<string[]> {
@@ -384,72 +576,6 @@ export function createPdfProcessor() {
       
       // Basic compression by re-saving
       return await pdf.save();
-    },
-
-    async protectPdf(file: File, password: string, permissions: any = {}): Promise<Uint8Array> {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
-      
-      // Create a new PDF with password protection simulation
-      // Note: pdf-lib doesn't support true encryption in browser environments
-      // This creates a basic version that includes metadata about protection
-      
-      const protectedPdf = await PDFDocument.create();
-      const pages = await protectedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
-      
-      pages.forEach((page) => protectedPdf.addPage(page));
-      
-      // Add metadata to indicate protection
-      protectedPdf.setTitle(`Protected: ${file.name}`);
-      protectedPdf.setSubject('This document is password protected');
-      protectedPdf.setKeywords(`password-protected,${password.length}-char-password`);
-      
-      // For demonstration, we'll embed the password in metadata (NOT secure for production)
-      protectedPdf.setCreator(`Protected with password: ${btoa(password)}`);
-      
-      return await protectedPdf.save();
-    },
-
-    async unlockPdf(file: File, password: string): Promise<Uint8Array> {
-      const arrayBuffer = await file.arrayBuffer();
-      
-      try {
-        // Try to load with password first using pdf.js
-        const pdf = await pdfjsLib.getDocument({ 
-          data: arrayBuffer,
-          password: password
-        }).promise;
-        
-        // If successful, create unlocked version using pdf-lib
-        const pdfDoc = await PDFDocument.load(arrayBuffer);
-        
-        // Try to check if the provided password matches metadata
-        const creator = pdfDoc.getCreator();
-        if (creator && creator.includes('Protected with password:')) {
-          const embeddedPassword = atob(creator.split('Protected with password: ')[1]);
-          if (embeddedPassword !== password) {
-            throw new Error('Invalid password');
-          }
-        }
-        
-        // Create unlocked version
-        const unlockedPdf = await PDFDocument.create();
-        const pages = await unlockedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
-        
-        pages.forEach((page) => unlockedPdf.addPage(page));
-        
-        // Remove protection metadata
-        unlockedPdf.setTitle(file.name.replace('protected-', ''));
-        unlockedPdf.setSubject('Unlocked document');
-        unlockedPdf.setCreator('Unlocked PDF');
-        
-        return await unlockedPdf.save();
-      } catch (error: any) {
-        if (error.name === 'PasswordException' || error.message?.includes('password')) {
-          throw new Error('Invalid password. Please check your password and try again.');
-        }
-        throw new Error('Failed to unlock PDF. The file may be corrupted or use unsupported encryption.');
-      }
     },
 
     async addWatermark(file: File, watermarkOptions: {

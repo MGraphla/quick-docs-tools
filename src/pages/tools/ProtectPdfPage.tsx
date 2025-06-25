@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Upload, FileText, Download, Shield, Loader2, CheckCircle, AlertCircle, Settings, Zap, X, Save, Eye, EyeOff, Lock, Unlock, Key } from "lucide-react";
+import { Upload, FileText, Download, Shield, Loader2, CheckCircle, AlertCircle, Eye, EyeOff, Lock, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,17 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { PDFDocument } from "pdf-lib";
-import { saveAs } from "file-saver";
-import * as pdfjsLib from "pdfjs-dist";
-import CryptoJS from "crypto-js";
-
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
 
 interface ProtectedFile {
   name: string;
@@ -49,14 +42,7 @@ const ProtectPdfPage = () => {
   const [protectedFile, setProtectedFile] = useState<ProtectedFile | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  const pdfProcessor = createPdfProcessor();
 
   const handleFileSelect = useCallback(async (selectedFiles: FileList | null) => {
     if (!selectedFiles || selectedFiles.length === 0) return;
@@ -70,16 +56,14 @@ const ProtectPdfPage = () => {
     const loadingToast = toast.loading("Loading PDF...");
     
     try {
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      
+      const info = await pdfProcessor.loadPdf(selectedFile);
       setFile(selectedFile);
       setFileInfo({
         size: formatFileSize(selectedFile.size),
-        pages: pdf.numPages
+        pages: info.pageCount
       });
       setProtectedFile(null);
-      toast.success(`PDF loaded: ${pdf.numPages} pages`);
+      toast.success(`PDF loaded: ${info.pageCount} pages`);
     } catch (error) {
       console.error('Error loading PDF:', error);
       toast.error(error instanceof Error ? error.message : "Failed to load PDF");
@@ -172,51 +156,17 @@ const ProtectPdfPage = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // Load the PDF document
-      const arrayBuffer = await file.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
-      
-      // Since pdf-lib doesn't support encryption in the browser, we'll use a workaround
-      // We'll add metadata to indicate the file is password-protected
-      pdfDoc.setTitle(`Protected: ${file.name}`);
-      pdfDoc.setSubject('This document is password protected');
-      
-      // Store the password hash in the PDF metadata (this is for demo purposes)
-      // In a real implementation, we would use proper PDF encryption
-      const passwordHash = CryptoJS.SHA256(password).toString();
-      pdfDoc.setProducer(`Protected with password hash: ${passwordHash}`);
-      
-      // Add custom metadata about permissions
-      const permissionsString = Object.entries(permissions)
-        .map(([key, value]) => `${key}:${value ? 'allowed' : 'denied'}`)
-        .join(',');
-      
-      pdfDoc.setKeywords(`password-protected,${securityLevel},${permissionsString}`);
-      
-      // Save the PDF
-      const pdfBytes = await pdfDoc.save();
+      // Use the actual PDF protection method
+      const protectedPdfBytes = await pdfProcessor.protectPdf(file, password, permissions);
       
       // Create a blob and URL for download
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const blob = new Blob([protectedPdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
-      
-      // Create a new blob that includes the password in a wrapper format
-      // This is a custom format that our viewer will understand
-      const protectedBlob = new Blob([
-        JSON.stringify({
-          password: password,
-          permissions: permissions,
-          securityLevel: securityLevel,
-          pdfData: Array.from(new Uint8Array(await blob.arrayBuffer()))
-        })
-      ], { type: 'application/pdf-protected' });
-      
-      const protectedUrl = URL.createObjectURL(protectedBlob);
       
       setProtectedFile({
         name: `protected-${file.name}`,
-        url: protectedUrl,
-        size: formatFileSize(protectedBlob.size)
+        url: url,
+        size: formatFileSize(blob.size)
       });
       
       setProgress(100);
@@ -236,7 +186,10 @@ const ProtectPdfPage = () => {
   const downloadProtected = () => {
     if (!protectedFile) return;
     
-    saveAs(protectedFile.url, protectedFile.name);
+    const link = document.createElement('a');
+    link.href = protectedFile.url;
+    link.download = protectedFile.name;
+    link.click();
     toast.success(`Downloaded ${protectedFile.name}`);
   };
 

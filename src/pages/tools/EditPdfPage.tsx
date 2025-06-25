@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Upload, FileText, Download, Type, Square, Circle, Highlighter, Pencil, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, Settings, Zap, X, Save, Undo, Redo, Eraser, Trash2, Eye } from "lucide-react";
+import { Upload, FileText, Download, Type, Square, Circle, Highlighter, Pencil, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, Save, Undo, Redo, Eraser, Trash2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
@@ -17,6 +16,20 @@ interface EditedFile {
   name: string;
   url: string;
   size: string;
+}
+
+interface PdfEdit {
+  type: 'text' | 'highlight' | 'shape' | 'image';
+  page: number;
+  x: number;
+  y: number;
+  content?: string;
+  fontSize?: number;
+  color?: string;
+  width?: number;
+  height?: number;
+  shapeType?: 'rectangle' | 'circle';
+  imageData?: string;
 }
 
 const EditPdfPage = () => {
@@ -36,7 +49,11 @@ const EditPdfPage = () => {
   const [progressMessage, setProgressMessage] = useState("");
   const [editedFile, setEditedFile] = useState<EditedFile | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [pageImage, setPageImage] = useState<string | null>(null);
+  const [edits, setEdits] = useState<PdfEdit[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfProcessor = createPdfProcessor();
 
@@ -60,6 +77,11 @@ const EditPdfPage = () => {
       });
       setEditedFile(null);
       setCurrentPage(1);
+      setEdits([]);
+      
+      // Render the first page
+      await renderCurrentPage(selectedFile, 1);
+      
       toast.success(`PDF loaded: ${info.pageCount} pages`);
     } catch (error) {
       console.error('Error loading PDF:', error);
@@ -68,6 +90,16 @@ const EditPdfPage = () => {
       toast.dismiss(loadingToast);
     }
   }, []);
+
+  const renderCurrentPage = async (pdfFile: File, pageNum: number) => {
+    try {
+      const imageData = await pdfProcessor.renderPdfPage(pdfFile, pageNum, 1.5);
+      setPageImage(imageData);
+    } catch (error) {
+      console.error('Error rendering page:', error);
+      toast.error("Failed to render PDF page");
+    }
+  };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -88,9 +120,55 @@ const EditPdfPage = () => {
     handleFileSelect(e.dataTransfer.files);
   }, [handleFileSelect]);
 
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!file || !fileInfo) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Convert coordinates to PDF scale
+    const pdfX = (x / rect.width) * 595; // Standard PDF width
+    const pdfY = (y / rect.height) * 842; // Standard PDF height
+    
+    const newEdit: PdfEdit = {
+      type: editTool as 'text' | 'highlight' | 'shape' | 'image',
+      page: currentPage,
+      x: pdfX,
+      y: pdfY,
+      content: editTool === 'text' ? textInput || 'Sample Text' : undefined,
+      fontSize: fontSize[0],
+      color: textColor,
+      width: editTool === 'highlight' ? 100 : editTool === 'shape' ? 80 : undefined,
+      height: editTool === 'highlight' ? 20 : editTool === 'shape' ? 80 : undefined,
+      shapeType: editTool === 'shape' ? (editTool === 'rectangle' ? 'rectangle' : 'circle') : undefined,
+      imageData: editTool === 'image' ? selectedImage : undefined
+    };
+    
+    setEdits(prev => [...prev, newEdit]);
+    toast.success(`Added ${editTool} to page ${currentPage}`);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setSelectedImage(e.target?.result as string);
+        toast.success("Image loaded. Click on the PDF to place it.");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const savePdf = async () => {
     if (!file) {
       toast.error("Please select a PDF file");
+      return;
+    }
+
+    if (edits.length === 0) {
+      toast.error("No edits to save. Please add some content to the PDF.");
       return;
     }
 
@@ -113,9 +191,11 @@ const EditPdfPage = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // Simulate PDF creation
-      const pdfContent = `Edited version of ${file.name}`;
-      const blob = new Blob([pdfContent], { type: 'application/pdf' });
+      // Apply edits to PDF using the actual editing function
+      const editedPdfBytes = await pdfProcessor.editPdf(file, edits);
+      
+      // Create a blob and URL for download
+      const blob = new Blob([editedPdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       
       setEditedFile({
@@ -148,20 +228,17 @@ const EditPdfPage = () => {
     toast.success(`Downloaded ${editedFile.name}`);
   };
 
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-    }
+  const clearEdits = () => {
+    setEdits([]);
+    toast.success("All edits cleared");
   };
 
-  const changePage = (newPage: number) => {
-    if (!fileInfo) return;
+  const changePage = async (newPage: number) => {
+    if (!fileInfo || !file) return;
     if (newPage < 1 || newPage > fileInfo.pages) return;
+    
     setCurrentPage(newPage);
+    await renderCurrentPage(file, newPage);
   };
 
   return (
@@ -408,6 +485,36 @@ const EditPdfPage = () => {
                     </div>
                   </TabsContent>
                 </Tabs>
+                
+                <div className="mt-4 space-y-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditTool("image")}
+                    className={`w-full ${editTool === "image" ? "bg-blue-50 border-blue-300" : ""}`}
+                  >
+                    <ImageIcon className="h-4 w-4 mr-2" />
+                    Add Image
+                  </Button>
+                  {editTool === "image" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => imageInputRef.current?.click()}
+                      className="w-full"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Image
+                    </Button>
+                  )}
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -419,7 +526,7 @@ const EditPdfPage = () => {
                 <div className="flex items-center justify-between">
                   <CardTitle>PDF Editor</CardTitle>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={clearCanvas}>
+                    <Button variant="outline" size="sm" onClick={clearEdits}>
                       <Eraser className="h-4 w-4 mr-1" />
                       Clear
                     </Button>
@@ -434,18 +541,27 @@ const EditPdfPage = () => {
                   </div>
                 </div>
                 <CardDescription>
-                  Page {currentPage} of {fileInfo.pages} - Click on the document to add content
+                  Page {currentPage} of {fileInfo.pages} - Click on the document to add content ({edits.length} edits)
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="bg-gray-100 p-4 rounded-lg flex items-center justify-center min-h-[600px]">
-                  <div className="bg-white shadow-lg rounded-lg overflow-hidden" style={{ width: '595px', height: '842px' }}>
-                    <canvas 
-                      ref={canvasRef}
-                      width={595}
-                      height={842}
-                      className="w-full h-full border"
-                    />
+                  <div 
+                    className="bg-white shadow-lg rounded-lg overflow-hidden cursor-crosshair relative"
+                    style={{ width: '595px', height: '842px' }}
+                    onClick={handleCanvasClick}
+                  >
+                    {pageImage ? (
+                      <img 
+                        src={pageImage} 
+                        alt={`Page ${currentPage}`}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -462,7 +578,7 @@ const EditPdfPage = () => {
                   </div>
                   <Button 
                     onClick={savePdf} 
-                    disabled={processing}
+                    disabled={processing || edits.length === 0}
                     className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
                   >
                     {processing ? (
