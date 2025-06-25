@@ -5,8 +5,8 @@ import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
 
-// Set up PDF.js worker using CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js';
+// Set up PDF.js worker using a reliable CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.js';
 
 export interface PdfInfo {
   pageCount: number;

@@ -1,24 +1,18 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import { Upload, FileText, Download, Pen, Type, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, Settings, Zap, X, Save, Undo, Redo, Eraser, Trash2, Eye, Signature, Move } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState, useRef, useCallback } from "react";
+import { Upload, FileText, Download, Loader2, CheckCircle, Signature, Type, ImageIcon, PenTool, AlertCircle, Move, RotateCw, Trash2, Eye, Save } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
-import { saveAs } from "file-saver";
-import SignatureCanvas from "react-signature-canvas";
+import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
+import SignatureCanvas from 'react-signature-canvas';
 import Draggable from "react-draggable";
-import * as pdfjsLib from "pdfjs-dist";
-
-// Set up PDF.js worker using CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js';
 
 interface SignedFile {
   name: string;
@@ -26,68 +20,39 @@ interface SignedFile {
   size: string;
 }
 
-interface SignatureState {
-  type: 'draw' | 'text' | 'image' | null;
-  data: string | null;
-  position: { x: number; y: number } | null;
-  size: { width: number; height: number };
-  isDragging: boolean;
+interface SignaturePosition {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pageNumber: number;
 }
 
 const SignPdfPage = () => {
   const [file, setFile] = useState<File | null>(null);
   const [fileInfo, setFileInfo] = useState<{ size: string; pages: number } | null>(null);
-  const [signatureType, setSignatureType] = useState("draw");
-  const [typedSignature, setTypedSignature] = useState("");
-  const [typedSignatureFont, setTypedSignatureFont] = useState("Helvetica");
-  const [typedSignatureSize, setTypedSignatureSize] = useState([36]);
-  const [typedSignatureColor, setTypedSignatureColor] = useState("#000000");
-  const [uploadedSignature, setUploadedSignature] = useState<File | null>(null);
-  const [uploadedSignaturePreview, setUploadedSignaturePreview] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pdfPageImage, setPdfPageImage] = useState<string | null>(null);
-  const [pdfScale, setPdfScale] = useState(1.5);
-  const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 });
-  const [signatureState, setSignatureState] = useState<SignatureState>({
-    type: null,
-    data: null,
-    position: null,
-    size: { width: 200, height: 100 },
-    isDragging: false
-  });
+  const [pageImage, setPageImage] = useState<string | null>(null);
+  const [signatureType, setSignatureType] = useState<'draw' | 'text' | 'image'>('draw');
+  const [textSignature, setTextSignature] = useState('');
+  const [signatureImage, setSignatureImage] = useState<string | null>(null);
+  const [signaturePositions, setSignaturePositions] = useState<SignaturePosition[]>([]);
+  const [currentPosition, setCurrentPosition] = useState<SignaturePosition | null>(null);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("");
+  const [progressMessage, setProgressMessage] = useState('');
   const [signedFile, setSignedFile] = useState<SignedFile | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [penSize, setPenSize] = useState([2]);
+  const [fontSize, setFontSize] = useState([24]);
+  const [fontFamily, setFontFamily] = useState('Arial');
+  const [textColor, setTextColor] = useState('#000000');
+  const [signatureWidth, setSignatureWidth] = useState([150]);
+  const [signatureHeight, setSignatureHeight] = useState([50]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const signatureImageRef = useRef<HTMLInputElement>(null);
-  const signatureCanvasRef = useRef<SignatureCanvas>(null);
-  const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Load Google Fonts
-  useEffect(() => {
-    const link = document.createElement('link');
-    link.href = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&family=Pacifico&family=Satisfy&display=swap';
-    link.rel = 'stylesheet';
-    document.head.appendChild(link);
-    return () => {
-      if (document.head.contains(link)) {
-        document.head.removeChild(link);
-      }
-    };
-  }, []);
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const signaturePadRef = useRef<SignatureCanvas>(null);
+  const pdfProcessor = createPdfProcessor();
 
   const handleFileSelect = useCallback(async (selectedFiles: FileList | null) => {
     if (!selectedFiles || selectedFiles.length === 0) return;
@@ -101,75 +66,44 @@ const SignPdfPage = () => {
     const loadingToast = toast.loading("Loading PDF...");
     
     try {
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      
+      const info = await pdfProcessor.loadPdf(selectedFile);
       setFile(selectedFile);
       setFileInfo({
         size: formatFileSize(selectedFile.size),
-        pages: pdf.numPages
+        pages: info.pageCount
       });
       setSignedFile(null);
       setCurrentPage(1);
-      setSignatureState({
-        type: null,
-        data: null,
-        position: null,
-        size: { width: 200, height: 100 },
-        isDragging: false
-      });
+      setSignaturePositions([]);
       
-      // Render first page
-      await renderPdfPage(selectedFile, 1, pdfScale);
+      // Render the first page
+      await renderCurrentPage(selectedFile, 1);
       
-      toast.success(`PDF loaded: ${pdf.numPages} pages`);
+      toast.success(`PDF loaded: ${info.pageCount} pages`);
     } catch (error) {
       console.error('Error loading PDF:', error);
       toast.error(error instanceof Error ? error.message : "Failed to load PDF");
     } finally {
       toast.dismiss(loadingToast);
     }
-  }, [pdfScale]);
+  }, []);
 
-  const renderPdfPage = async (pdfFile: File, pageNumber: number, scale: number) => {
+  const renderCurrentPage = async (pdfFile: File, pageNum: number) => {
     try {
-      const arrayBuffer = await pdfFile.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const page = await pdf.getPage(pageNumber);
-      const viewport = page.getViewport({ scale });
-      
-      setPdfDimensions({ width: viewport.width, height: viewport.height });
-      
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d')!;
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-
-      await page.render({
-        canvasContext: context,
-        viewport: viewport
-      }).promise;
-
-      const pageImage = canvas.toDataURL('image/jpeg', 0.95);
-      setPdfPageImage(pageImage);
-      
-      // Update canvas with the rendered page
-      if (pdfCanvasRef.current) {
-        const canvas = pdfCanvasRef.current;
-        const ctx = canvas.getContext('2d');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        
-        const img = new Image();
-        img.onload = () => {
-          ctx?.drawImage(img, 0, 0);
-        };
-        img.src = pageImage;
-      }
+      const imageData = await pdfProcessor.renderPdfPage(pdfFile, pageNum, 1.5);
+      setPageImage(imageData);
     } catch (error) {
       console.error('Error rendering page:', error);
       toast.error("Failed to render PDF page");
     }
+  };
+
+  const changePage = async (newPage: number) => {
+    if (!fileInfo || !file) return;
+    if (newPage < 1 || newPage > fileInfo.pages) return;
+    
+    setCurrentPage(newPage);
+    await renderCurrentPage(file, newPage);
   };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -191,144 +125,78 @@ const SignPdfPage = () => {
     handleFileSelect(e.dataTransfer.files);
   }, [handleFileSelect]);
 
-  const handleSignatureUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (selectedFile && selectedFile.type.startsWith('image/')) {
-      setUploadedSignature(selectedFile);
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setUploadedSignaturePreview(result);
-        setSignatureState(prev => ({
-          ...prev,
-          type: 'image',
-          data: result
-        }));
+        setSignatureImage(e.target?.result as string);
+        toast.success("Signature image loaded");
       };
-      reader.readAsDataURL(selectedFile);
-    } else {
-      toast.error("Please select a valid image file");
+      reader.readAsDataURL(file);
     }
   };
 
-  const clearSignature = () => {
-    if (signatureCanvasRef.current) {
-      signatureCanvasRef.current.clear();
-      setSignatureState(prev => ({
-        ...prev,
-        type: null,
-        data: null
-      }));
-    }
-  };
-
-  const saveSignature = () => {
-    if (signatureType === "draw") {
-      if (signatureCanvasRef.current && !signatureCanvasRef.current.isEmpty()) {
-        const signatureData = signatureCanvasRef.current.toDataURL('image/png');
-        setSignatureState(prev => ({
-          ...prev,
-          type: 'draw',
-          data: signatureData
-        }));
-        toast.success("Signature saved! Now place it on the document.");
-      } else {
-        toast.error("Please draw your signature first");
-      }
-    } else if (signatureType === "type") {
-      if (typedSignature.trim()) {
-        setSignatureState(prev => ({
-          ...prev,
-          type: 'text',
-          data: typedSignature
-        }));
-        toast.success("Signature saved! Now place it on the document.");
-      } else {
-        toast.error("Please enter your signature text");
-      }
-    } else if (signatureType === "upload") {
-      if (uploadedSignaturePreview) {
-        setSignatureState(prev => ({
-          ...prev,
-          type: 'image',
-          data: uploadedSignaturePreview
-        }));
-        toast.success("Signature saved! Now place it on the document.");
-      } else {
-        toast.error("Please upload a signature image");
-      }
-    }
-  };
-
-  const updateTypedSignature = () => {
-    if (typedSignature.trim()) {
-      setSignatureState(prev => ({
-        ...prev,
-        type: 'text',
-        data: typedSignature
-      }));
-    }
-  };
-
-  useEffect(() => {
-    if (signatureType === "type") {
-      updateTypedSignature();
-    }
-  }, [typedSignature, typedSignatureFont, typedSignatureSize, typedSignatureColor]);
-
-  const handleDragStart = () => {
-    setSignatureState(prev => ({ ...prev, isDragging: true }));
-  };
-
-  const handleDragStop = (e: any, data: { x: number; y: number }) => {
-    setSignatureState(prev => ({
-      ...prev,
-      position: { x: data.x, y: data.y },
-      isDragging: false
-    }));
-  };
-
-  const handleResizeSignature = (newSize: { width: number; height: number }) => {
-    setSignatureState(prev => ({
-      ...prev,
-      size: newSize
-    }));
-  };
-
-  const changePage = async (newPage: number) => {
-    if (!fileInfo || !file) return;
-    if (newPage < 1 || newPage > fileInfo.pages) return;
+  const addSignature = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!file) return;
     
-    setCurrentPage(newPage);
-    await renderPdfPage(file, newPage, pdfScale);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Convert coordinates to PDF scale
+    const pdfX = (x / rect.width) * 595; // Standard PDF width
+    const pdfY = (y / rect.height) * 842; // Standard PDF height
+    
+    const newPosition: SignaturePosition = {
+      x: pdfX,
+      y: pdfY,
+      width: signatureWidth[0],
+      height: signatureHeight[0],
+      pageNumber: currentPage
+    };
+    
+    setSignaturePositions(prev => [...prev, newPosition]);
+    toast.success(`Signature added to page ${currentPage}`);
   };
 
-  const signPdf = async () => {
+  const removeSignature = (index: number) => {
+    setSignaturePositions(prev => prev.filter((_, i) => i !== index));
+    toast.success("Signature removed");
+  };
+
+  const clearSignatures = () => {
+    setSignaturePositions([]);
+    toast.success("All signatures cleared");
+  };
+
+  const clearSignaturePad = () => {
+    signaturePadRef.current?.clear();
+    toast.success("Signature pad cleared");
+  };
+
+  const savePdf = async () => {
     if (!file) {
       toast.error("Please select a PDF file");
       return;
     }
 
-    if (!signatureState.type || !signatureState.data) {
-      toast.error("Please create a signature first");
-      return;
-    }
-
-    if (!signatureState.position) {
-      toast.error("Please place your signature on the document");
+    if (signaturePositions.length === 0) {
+      toast.error("Please add at least one signature to the PDF");
       return;
     }
 
     setProcessing(true);
     setProgress(0);
-    setProgressMessage("Preparing to sign document...");
+    setProgressMessage("Preparing to add signatures...");
 
     try {
       const steps = [
-        { message: "Loading PDF document...", progress: 15 },
-        { message: "Processing signature...", progress: 30 },
-        { message: "Applying signature to document...", progress: 50 },
-        { message: "Finalizing signed document...", progress: 80 }
+        { message: "Analyzing PDF structure...", progress: 15 },
+        { message: "Processing signature data...", progress: 30 },
+        { message: "Adding signatures to pages...", progress: 50 },
+        { message: "Updating PDF content...", progress: 70 },
+        { message: "Finalizing document...", progress: 90 }
       ];
 
       for (const step of steps) {
@@ -337,93 +205,30 @@ const SignPdfPage = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // Load the PDF document
-      const arrayBuffer = await file.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      // Process each signature
+      let currentPdfBytes = await file.arrayBuffer();
       
-      // Get the page to add the signature to
-      const pages = pdfDoc.getPages();
-      const page = pages[currentPage - 1];
-      
-      // Calculate the position based on the PDF dimensions and the signature position
-      const { width, height } = page.getSize();
-      
-      // Calculate the position relative to the PDF page
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      const canvasRect = pdfCanvasRef.current?.getBoundingClientRect();
-      
-      if (!containerRect || !canvasRect) {
-        throw new Error("Could not determine container dimensions");
+      for (const position of signaturePositions) {
+        const signatureOptions = {
+          type: signatureType,
+          x: position.x,
+          y: position.y,
+          width: position.width,
+          height: position.height,
+          pageNumber: position.pageNumber,
+          text: signatureType === 'text' ? textSignature : undefined,
+          fontSize: fontSize[0],
+          color: textColor,
+          fontFamily,
+          signatureData: signatureType === 'image' ? signatureImage : undefined,
+          canvas: signatureType === 'draw' ? signaturePadRef.current?.getCanvas() : undefined
+        };
+
+        const pdfFile = new File([currentPdfBytes], file.name, { type: 'application/pdf' });
+        currentPdfBytes = await pdfProcessor.addSignature(pdfFile, signatureOptions);
       }
       
-      // Calculate the scale factor between the displayed PDF and the actual PDF
-      const scaleX = width / pdfDimensions.width;
-      const scaleY = height / pdfDimensions.height;
-      
-      // Calculate the position in PDF coordinates
-      const pdfX = signatureState.position.x * scaleX;
-      const pdfY = height - (signatureState.position.y * scaleY) - (signatureState.size.height * scaleY / 2);
-      
-      // Apply the signature based on its type
-      if (signatureState.type === 'image' || signatureState.type === 'draw') {
-        // For image or drawn signature, embed the image
-        const signatureImage = signatureState.data;
-        if (!signatureImage) throw new Error("Signature data is missing");
-        
-        // Convert data URL to Uint8Array
-        const base64Data = signatureImage.split(',')[1];
-        const signatureBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-        
-        // Embed the image
-        const signatureImageEmbed = await pdfDoc.embedPng(signatureBytes);
-        
-        // Calculate dimensions
-        const signatureWidth = signatureState.size.width * scaleX;
-        const signatureHeight = signatureState.size.height * scaleY;
-        
-        // Draw the image on the page
-        page.drawImage(signatureImageEmbed, {
-          x: pdfX,
-          y: pdfY,
-          width: signatureWidth,
-          height: signatureHeight
-        });
-      } else if (signatureState.type === 'text') {
-        // For text signature, add text
-        // Select font based on the chosen font family
-        let font;
-        try {
-          if (typedSignatureFont === 'Helvetica') {
-            font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-          } else {
-            // For custom fonts, fall back to Helvetica in this implementation
-            font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-          }
-        } catch (error) {
-          console.error("Error embedding font:", error);
-          font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-        }
-        
-        // Parse the color
-        const r = parseInt(typedSignatureColor.slice(1, 3), 16) / 255;
-        const g = parseInt(typedSignatureColor.slice(3, 5), 16) / 255;
-        const b = parseInt(typedSignatureColor.slice(5, 7), 16) / 255;
-        
-        // Draw the text
-        page.drawText(typedSignature, {
-          x: pdfX,
-          y: pdfY,
-          size: typedSignatureSize[0] * scaleY,
-          font,
-          color: rgb(r, g, b)
-        });
-      }
-      
-      // Save the PDF
-      const pdfBytes = await pdfDoc.save();
-      
-      // Create a blob and URL for download
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const blob = new Blob([currentPdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       
       setSignedFile({
@@ -433,7 +238,7 @@ const SignPdfPage = () => {
       });
       
       setProgress(100);
-      setProgressMessage("Signing completed!");
+      setProgressMessage("Signatures added successfully!");
       toast.success("PDF signed successfully!");
       
     } catch (error) {
@@ -449,7 +254,10 @@ const SignPdfPage = () => {
   const downloadSigned = () => {
     if (!signedFile) return;
     
-    saveAs(signedFile.url, signedFile.name);
+    const link = document.createElement('a');
+    link.href = signedFile.url;
+    link.download = signedFile.name;
+    link.click();
     toast.success(`Downloaded ${signedFile.name}`);
   };
 
@@ -457,11 +265,11 @@ const SignPdfPage = () => {
     <div className="space-y-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="text-center">
-        <div className="inline-flex items-center bg-rose-100 text-rose-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
+        <div className="inline-flex items-center bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
           <Signature className="h-4 w-4 mr-2" />
-          PDF Signature Tool
+          PDF Signature
         </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Sign PDF</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">Sign PDF Documents</h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
           Add your signature to PDF documents with our professional signing tools. Draw, type, or upload your signature.
         </p>
@@ -469,11 +277,11 @@ const SignPdfPage = () => {
 
       {/* Upload Area */}
       {!file && (
-        <Card className="border-2 border-dashed border-gray-300 hover:border-rose-400 transition-all duration-300">
+        <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-all duration-300">
           <CardContent className="p-8">
             <div
               className={`text-center transition-all duration-300 cursor-pointer ${
-                dragOver ? 'scale-105 bg-rose-50' : ''
+                dragOver ? 'scale-105 bg-blue-50' : ''
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -481,7 +289,7 @@ const SignPdfPage = () => {
               onClick={() => fileInputRef.current?.click()}
             >
               <div className="mb-6">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-rose-500 to-red-600 rounded-full mb-4 shadow-lg">
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full mb-4 shadow-lg">
                   <Upload className="h-10 w-10 text-white" />
                 </div>
               </div>
@@ -489,9 +297,9 @@ const SignPdfPage = () => {
                 Drop PDF file here or click to browse
               </h3>
               <p className="text-gray-600 mb-6 text-lg">
-                Select a PDF file to sign with your digital signature
+                Select a PDF document to add your signature
               </p>
-              <Button size="lg" className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700">
+              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
                 <Upload className="h-5 w-5 mr-2" />
                 Choose PDF File
               </Button>
@@ -510,7 +318,7 @@ const SignPdfPage = () => {
       {/* PDF Signing Interface */}
       {file && fileInfo && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left Sidebar - Signature Tools */}
+          {/* Signature Tools Sidebar */}
           <div className="lg:col-span-1 space-y-6">
             <Card>
               <CardHeader>
@@ -556,105 +364,66 @@ const SignPdfPage = () => {
                       Next
                     </Button>
                   </div>
+
+                  <div className="text-sm text-gray-600">
+                    Signatures on this page: {signaturePositions.filter(pos => pos.pageNumber === currentPage).length}
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border border-rose-200 shadow-md">
-              <CardHeader className="bg-gradient-to-r from-rose-50 to-red-50">
-                <CardTitle className="text-rose-800">Create Signature</CardTitle>
+            <Card>
+              <CardHeader>
+                <CardTitle>Signature Tools</CardTitle>
                 <CardDescription>
-                  Choose how you want to create your signature
+                  Choose how you want to add your signature
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pt-4">
-                <Tabs value={signatureType} onValueChange={setSignatureType} className="w-full">
-                  <TabsList className="grid grid-cols-3 mb-4 w-full bg-rose-100">
-                    <TabsTrigger value="draw" className="flex items-center gap-1 data-[state=active]:bg-rose-600 data-[state=active]:text-white">
-                      <Pen className="h-4 w-4" />
-                      Draw
-                    </TabsTrigger>
-                    <TabsTrigger value="type" className="flex items-center gap-1 data-[state=active]:bg-rose-600 data-[state=active]:text-white">
-                      <Type className="h-4 w-4" />
-                      Type
-                    </TabsTrigger>
-                    <TabsTrigger value="upload" className="flex items-center gap-1 data-[state=active]:bg-rose-600 data-[state=active]:text-white">
-                      <ImageIcon className="h-4 w-4" />
-                      Upload
-                    </TabsTrigger>
+              <CardContent>
+                <Tabs value={signatureType} onValueChange={(value) => setSignatureType(value as 'draw' | 'text' | 'image')}>
+                  <TabsList className="grid grid-cols-3 mb-4">
+                    <TabsTrigger value="draw">Draw</TabsTrigger>
+                    <TabsTrigger value="text">Type</TabsTrigger>
+                    <TabsTrigger value="image">Upload</TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="draw" className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Draw Your Signature</Label>
-                      <div className="border-2 rounded-lg p-4 bg-white shadow-inner">
-                        <SignatureCanvas
-                          ref={signatureCanvasRef}
-                          penColor={typedSignatureColor}
-                          canvasProps={{
-                            width: 280,
-                            height: 120,
-                            className: "border border-gray-200 rounded cursor-crosshair w-full bg-white shadow-sm"
-                          }}
-                          dotSize={penSize[0]}
-                          minWidth={penSize[0] * 0.5}
-                          maxWidth={penSize[0] * 2}
-                        />
-                        <div className="flex justify-between mt-3">
-                          <div className="space-y-1 w-full mr-2">
-                            <div className="flex justify-between">
-                              <Label className="text-xs">Pen Size: {penSize[0]}px</Label>
-                              <Label className="text-xs">Color:</Label>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Slider
-                                value={penSize}
-                                onValueChange={setPenSize}
-                                min={1}
-                                max={5}
-                                step={0.5}
-                                className="w-full"
-                              />
-                              <Input
-                                type="color"
-                                value={typedSignatureColor}
-                                onChange={(e) => setTypedSignatureColor(e.target.value)}
-                                className="w-10 h-8 p-0"
-                              />
-                            </div>
-                          </div>
-                          <Button variant="outline" onClick={clearSignature} className="h-full">
-                            <Eraser className="h-4 w-4 mr-1" />
-                            Clear
-                          </Button>
-                        </div>
-                      </div>
-                      <Button onClick={saveSignature} className="w-full bg-rose-600 hover:bg-rose-700 text-white">
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Signature
-                      </Button>
+                    <div className="border rounded-lg p-2 bg-white">
+                      <SignatureCanvas
+                        ref={signaturePadRef}
+                        canvasProps={{
+                          width: 200,
+                          height: 100,
+                          className: 'signature-canvas border-gray-200'
+                        }}
+                        backgroundColor="white"
+                      />
                     </div>
+                    <Button variant="outline" size="sm" onClick={clearSignaturePad} className="w-full">
+                      Clear Signature Pad
+                    </Button>
                   </TabsContent>
                   
-                  <TabsContent value="type" className="space-y-4">
+                  <TabsContent value="text" className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Type Your Signature</Label>
+                      <Label>Signature Text</Label>
                       <Input
-                        placeholder="Enter your full name"
-                        value={typedSignature}
-                        onChange={(e) => setTypedSignature(e.target.value)}
-                        className="border-2 focus:border-rose-300"
+                        placeholder="Enter your signature"
+                        value={textSignature}
+                        onChange={(e) => setTextSignature(e.target.value)}
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label>Font Style</Label>
-                      <Select value={typedSignatureFont} onValueChange={setTypedSignatureFont}>
-                        <SelectTrigger className="border-2 focus:border-rose-300">
+                      <Label>Font Family</Label>
+                      <Select value={fontFamily} onValueChange={setFontFamily}>
+                        <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Helvetica">Helvetica</SelectItem>
+                          <SelectItem value="Arial">Arial</SelectItem>
+                          <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                          <SelectItem value="Courier New">Courier New</SelectItem>
                           <SelectItem value="Dancing Script">Dancing Script</SelectItem>
                           <SelectItem value="Pacifico">Pacifico</SelectItem>
                           <SelectItem value="Satisfy">Satisfy</SelectItem>
@@ -663,217 +432,171 @@ const SignPdfPage = () => {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label>Font Size: {typedSignatureSize[0]}px</Label>
+                      <Label>Font Size: {fontSize[0]}px</Label>
                       <Slider
-                        value={typedSignatureSize}
-                        onValueChange={setTypedSignatureSize}
+                        value={fontSize}
+                        onValueChange={setFontSize}
                         min={12}
-                        max={72}
-                        step={2}
-                        className="w-full"
+                        max={48}
+                        step={1}
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label>Color</Label>
+                      <Label>Text Color</Label>
                       <div className="flex gap-2">
                         <div 
                           className="w-10 h-10 rounded-md border"
-                          style={{ backgroundColor: typedSignatureColor }}
+                          style={{ backgroundColor: textColor }}
                         />
                         <Input
                           type="color"
-                          value={typedSignatureColor}
-                          onChange={(e) => setTypedSignatureColor(e.target.value)}
+                          value={textColor}
+                          onChange={(e) => setTextColor(e.target.value)}
                           className="w-full h-10"
                         />
                       </div>
                     </div>
                     
-                    {typedSignature && (
-                      <div className="border-2 rounded-lg p-4 bg-gray-50 shadow-inner">
-                        <p 
-                          className="text-center"
+                    {textSignature && (
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-sm text-gray-600 mb-1">Preview:</div>
+                        <div 
                           style={{ 
-                            fontFamily: typedSignatureFont === 'Helvetica' ? 'Arial, sans-serif' : typedSignatureFont, 
-                            fontSize: `${typedSignatureSize[0]}px`,
-                            color: typedSignatureColor
+                            fontFamily, 
+                            fontSize: `${fontSize[0]}px`,
+                            color: textColor,
+                            fontWeight: fontFamily.includes('Script') || fontFamily.includes('Pacifico') || fontFamily.includes('Satisfy') ? 'normal' : 'bold'
                           }}
                         >
-                          {typedSignature}
-                        </p>
+                          {textSignature}
+                        </div>
                       </div>
                     )}
-                    
-                    <Button onClick={saveSignature} className="w-full bg-rose-600 hover:bg-rose-700 text-white">
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Signature
-                    </Button>
                   </TabsContent>
                   
-                  <TabsContent value="upload" className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Upload Signature Image</Label>
-                      <div 
-                        className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-rose-400 transition-colors cursor-pointer bg-gray-50"
-                        onClick={() => signatureImageRef.current?.click()}
-                      >
-                        <ImageIcon className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                        <p className="text-sm text-gray-600 mb-2">Click to upload your signature image</p>
-                        <p className="text-xs text-gray-500">Supports JPG, PNG, GIF</p>
-                        <input
-                          ref={signatureImageRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleSignatureUpload}
-                          className="hidden"
-                        />
+                  <TabsContent value="image" className="space-y-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => imageInputRef.current?.click()}
+                      className="w-full"
+                    >
+                      <ImageIcon className="h-4 w-4 mr-2" />
+                      Upload Signature Image
+                    </Button>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                    {signatureImage && (
+                      <div className="p-2 bg-gray-50 rounded-lg">
+                        <img src={signatureImage} alt="Signature" className="max-w-full h-20 object-contain" />
                       </div>
-                      
-                      {uploadedSignaturePreview && (
-                        <div className="mt-4 border-2 rounded-lg p-4 bg-white shadow-inner">
-                          <img 
-                            src={uploadedSignaturePreview} 
-                            alt="Uploaded signature" 
-                            className="max-h-24 mx-auto"
-                          />
-                          <p className="text-xs text-center mt-2 text-gray-500">
-                            {uploadedSignature?.name}
-                          </p>
-                        </div>
-                      )}
-                      
-                      {uploadedSignaturePreview && (
-                        <Button onClick={saveSignature} className="w-full bg-rose-600 hover:bg-rose-700 text-white">
-                          <Save className="h-4 w-4 mr-2" />
-                          Use This Signature
-                        </Button>
-                      )}
-                    </div>
+                    )}
                   </TabsContent>
                 </Tabs>
-
-                <div className="mt-6">
-                  <Alert className="bg-blue-50 border-blue-200">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <AlertDescription className="text-blue-700">
-                      {signatureState.data 
-                        ? "Signature created! Now drag and position it on the document." 
-                        : "Create your signature, then drag it to position on the document"}
-                    </AlertDescription>
-                  </Alert>
+                
+                <div className="mt-4 space-y-2">
+                  <Label>Signature Size</Label>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Width: {signatureWidth[0]}px</Label>
+                    <Slider
+                      value={signatureWidth}
+                      onValueChange={setSignatureWidth}
+                      min={50}
+                      max={300}
+                      step={5}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Height: {signatureHeight[0]}px</Label>
+                    <Slider
+                      value={signatureHeight}
+                      onValueChange={setSignatureHeight}
+                      min={30}
+                      max={150}
+                      step={5}
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Main Content - PDF Preview & Signing */}
+          {/* PDF Viewer and Editor */}
           <div className="lg:col-span-3 space-y-6">
-            <Card className="border border-gray-300 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+            <Card>
+              <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-gray-800">Sign Document</CardTitle>
-                  <Badge variant={signatureState.position ? "default" : "outline"} className={signatureState.position ? "bg-green-100 text-green-800 hover:bg-green-100" : ""}>
-                    {signatureState.position ? "Signature Placed" : "Place Signature"}
-                  </Badge>
+                  <CardTitle>PDF Document</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={clearSignatures}>
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Clear All
+                    </Button>
+                  </div>
                 </div>
                 <CardDescription>
-                  Page {currentPage} of {fileInfo.pages} - Drag your signature to position it on the document
+                  Click on the document to place your signature ({signaturePositions.length} signatures added)
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-4">
-                <div className="bg-gray-100 p-4 rounded-lg flex items-center justify-center">
+              <CardContent>
+                <div className="bg-gray-100 p-4 rounded-lg flex items-center justify-center min-h-[600px]">
                   <div 
-                    ref={containerRef} 
-                    className="bg-white shadow-lg rounded-lg overflow-hidden max-w-full relative"
-                    style={{ width: pdfDimensions.width, height: pdfDimensions.height }}
+                    className="bg-white shadow-lg rounded-lg overflow-hidden cursor-crosshair relative"
+                    style={{ width: '595px', height: '842px' }}
+                    onClick={addSignature}
                   >
-                    {pdfPageImage ? (
-                      <>
-                        <canvas 
-                          ref={pdfCanvasRef}
-                          className="max-w-full h-auto border"
-                        />
-                        
-                        {/* Draggable Signature */}
-                        {signatureState.data && (
-                          <Draggable
-                            defaultPosition={signatureState.position || { x: pdfDimensions.width / 2 - signatureState.size.width / 2, y: pdfDimensions.height / 2 - signatureState.size.height / 2 }}
-                            bounds="parent"
-                            onStart={handleDragStart}
-                            onStop={handleDragStop}
-                          >
-                            <div 
-                              className={`absolute cursor-move border-2 ${signatureState.isDragging ? 'border-blue-500 bg-blue-50/20' : 'border-transparent hover:border-blue-300 hover:bg-blue-50/10'} rounded-md transition-colors duration-200`}
-                              style={{ 
-                                width: signatureState.size.width, 
-                                height: signatureState.size.height,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                            >
-                              {signatureState.type === 'draw' || signatureState.type === 'image' ? (
-                                <img 
-                                  src={signatureState.data || ''} 
-                                  alt="Signature" 
-                                  style={{ 
-                                    maxWidth: '100%', 
-                                    maxHeight: '100%',
-                                    pointerEvents: 'none'
-                                  }} 
-                                />
-                              ) : signatureState.type === 'text' ? (
-                                <div 
-                                  style={{ 
-                                    fontFamily: typedSignatureFont === 'Helvetica' ? 'Arial, sans-serif' : typedSignatureFont, 
-                                    fontSize: `${typedSignatureSize[0]}px`,
-                                    color: typedSignatureColor,
-                                    pointerEvents: 'none',
-                                    textAlign: 'center',
-                                    width: '100%'
-                                  }}
-                                >
-                                  {typedSignature}
-                                </div>
-                              ) : null}
-                              
-                              {/* Resize handles */}
-                              <div className="absolute bottom-0 right-0 w-4 h-4 bg-blue-500 rounded-full cursor-se-resize shadow-md"></div>
-                              <div className="absolute top-0 left-0 w-4 h-4 bg-blue-500/80 rounded-full cursor-move shadow-md flex items-center justify-center">
-                                <Move className="h-2 w-2 text-white" />
-                              </div>
-                            </div>
-                          </Draggable>
-                        )}
-                      </>
+                    {pageImage ? (
+                      <img 
+                        src={pageImage} 
+                        alt={`Page ${currentPage}`}
+                        className="w-full h-full object-contain"
+                      />
                     ) : (
-                      <div className="w-96 h-96 flex items-center justify-center text-gray-500">
-                        <div className="text-center">
-                          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-rose-500" />
-                          <p>Loading PDF page...</p>
-                        </div>
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <Loader2 className="h-8 w-8 animate-spin" />
                       </div>
                     )}
+                    
+                    {/* Signature Position Indicators */}
+                    {signaturePositions
+                      .filter(pos => pos.pageNumber === currentPage)
+                      .map((position, index) => (
+                        <div
+                          key={index}
+                          className="absolute border-2 border-blue-500 bg-blue-100 bg-opacity-30 flex items-center justify-center cursor-pointer hover:bg-opacity-50 transition-all"
+                          style={{
+                            left: `${(position.x / 595) * 100}%`,
+                            top: `${(position.y / 842) * 100}%`,
+                            width: `${(position.width / 595) * 100}%`,
+                            height: `${(position.height / 842) * 100}%`,
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeSignature(signaturePositions.indexOf(position));
+                          }}
+                        >
+                          <Signature className="h-4 w-4 text-blue-600" />
+                        </div>
+                      ))}
                   </div>
                 </div>
                 
                 <div className="flex justify-between mt-4">
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm">
+                      <Eye className="h-4 w-4 mr-1" />
+                      Preview
+                    </Button>
+                  </div>
                   <Button 
-                    variant="outline" 
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                    onClick={() => {
-                      setSignatureState(prev => ({ ...prev, position: null }));
-                      if (file) renderPdfPage(file, currentPage, pdfScale);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Reset Position
-                  </Button>
-                  <Button 
-                    onClick={signPdf} 
-                    disabled={processing || !signatureState.data || !signatureState.position}
-                    className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-md"
+                    onClick={savePdf}
+                    disabled={processing || signaturePositions.length === 0}
+                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
                   >
                     {processing ? (
                       <>
@@ -882,8 +605,8 @@ const SignPdfPage = () => {
                       </>
                     ) : (
                       <>
-                        <Signature className="h-4 w-4 mr-2" />
-                        Sign Document
+                        <Save className="h-4 w-4 mr-2" />
+                        Sign PDF
                       </>
                     )}
                   </Button>
@@ -896,12 +619,12 @@ const SignPdfPage = () => {
               <Card>
                 <CardContent className="p-6">
                   <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-rose-100 rounded-full mb-4">
-                      <Loader2 className="h-8 w-8 text-rose-600 animate-spin" />
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                      <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
                     </div>
                     <h3 className="text-lg font-semibold mb-2">Signing PDF</h3>
                     <p className="text-gray-600 mb-4">
-                      {progressMessage || "Applying your signature to the document..."}
+                      {progressMessage || "Adding your signatures to the PDF..."}
                     </p>
                     <div className="max-w-md mx-auto">
                       <div className="flex justify-between text-sm mb-2">
@@ -917,10 +640,10 @@ const SignPdfPage = () => {
 
             {/* Signed File */}
             {signedFile && (
-              <Card className="border-green-200 bg-green-50 shadow-md">
+              <Card className="border-green-200 bg-green-50">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full shadow-inner">
+                    <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full">
                       <CheckCircle className="h-6 w-6 text-green-600" />
                     </div>
                     <div className="flex-1">
@@ -929,12 +652,12 @@ const SignPdfPage = () => {
                       </h3>
                       <p className="text-green-700 mb-2">{signedFile.name}</p>
                       <p className="text-sm text-green-600">
-                        Your signature has been applied to the document
+                        Your signatures have been added to the document
                       </p>
                     </div>
                     <Button
                       onClick={downloadSigned}
-                      className="bg-green-600 hover:bg-green-700 text-white shadow-md"
+                      className="bg-green-600 hover:bg-green-700 text-white"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Download
@@ -952,7 +675,7 @@ const SignPdfPage = () => {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <strong>How to sign a PDF:</strong> Upload a PDF file, create your signature by drawing, typing, or uploading an image, drag to position your signature on the document, then click "Sign Document" to apply your signature.
+            <strong>How to sign a PDF:</strong> Upload a PDF document, choose your signature method (draw, type, or upload), then click on the document where you want to place your signature. You can add multiple signatures across different pages.
           </AlertDescription>
         </Alert>
       )}
