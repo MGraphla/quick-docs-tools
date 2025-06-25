@@ -4,7 +4,6 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
-import 'pdfjs-dist/build/pdf.worker.entry';
 
 export interface PdfInfo {
   pageCount: number;
