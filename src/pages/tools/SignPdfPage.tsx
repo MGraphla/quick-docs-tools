@@ -16,10 +16,9 @@ import { saveAs } from "file-saver";
 import SignatureCanvas from "react-signature-canvas";
 import Draggable from "react-draggable";
 import * as pdfjsLib from "pdfjs-dist";
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// Set up PDF.js worker with local bundle
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface SignedFile {
   name: string;
@@ -61,6 +60,7 @@ const SignPdfPage = () => {
   const [progressMessage, setProgressMessage] = useState("");
   const [signedFile, setSignedFile] = useState<SignedFile | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [penSize, setPenSize] = useState([2]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const signatureImageRef = useRef<HTMLInputElement>(null);
@@ -560,25 +560,25 @@ const SignPdfPage = () => {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Create Signature</CardTitle>
+            <Card className="border border-rose-200 shadow-md">
+              <CardHeader className="bg-gradient-to-r from-rose-50 to-red-50">
+                <CardTitle className="text-rose-800">Create Signature</CardTitle>
                 <CardDescription>
                   Choose how you want to create your signature
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Tabs value={signatureType} onValueChange={setSignatureType}>
-                  <TabsList className="grid grid-cols-3 mb-4">
-                    <TabsTrigger value="draw" className="flex items-center gap-1">
+              <CardContent className="pt-4">
+                <Tabs value={signatureType} onValueChange={setSignatureType} className="w-full">
+                  <TabsList className="grid grid-cols-3 mb-4 w-full bg-rose-100">
+                    <TabsTrigger value="draw" className="flex items-center gap-1 data-[state=active]:bg-rose-600 data-[state=active]:text-white">
                       <Pen className="h-4 w-4" />
                       Draw
                     </TabsTrigger>
-                    <TabsTrigger value="type" className="flex items-center gap-1">
+                    <TabsTrigger value="type" className="flex items-center gap-1 data-[state=active]:bg-rose-600 data-[state=active]:text-white">
                       <Type className="h-4 w-4" />
                       Type
                     </TabsTrigger>
-                    <TabsTrigger value="upload" className="flex items-center gap-1">
+                    <TabsTrigger value="upload" className="flex items-center gap-1 data-[state=active]:bg-rose-600 data-[state=active]:text-white">
                       <ImageIcon className="h-4 w-4" />
                       Upload
                     </TabsTrigger>
@@ -587,33 +587,49 @@ const SignPdfPage = () => {
                   <TabsContent value="draw" className="space-y-4">
                     <div className="space-y-2">
                       <Label>Draw Your Signature</Label>
-                      <div className="border rounded-lg p-4 bg-white">
+                      <div className="border-2 rounded-lg p-4 bg-white shadow-inner">
                         <SignatureCanvas
                           ref={signatureCanvasRef}
                           penColor={typedSignatureColor}
                           canvasProps={{
                             width: 280,
                             height: 120,
-                            className: "border border-gray-200 rounded cursor-crosshair w-full"
+                            className: "border border-gray-200 rounded cursor-crosshair w-full bg-white shadow-sm"
                           }}
+                          dotSize={penSize[0]}
+                          minWidth={penSize[0] * 0.5}
+                          maxWidth={penSize[0] * 2}
                         />
-                        <div className="flex justify-between mt-2">
-                          <div className="flex items-center gap-2">
-                            <Label>Color:</Label>
-                            <Input
-                              type="color"
-                              value={typedSignatureColor}
-                              onChange={(e) => setTypedSignatureColor(e.target.value)}
-                              className="w-10 h-8 p-0"
-                            />
+                        <div className="flex justify-between mt-3">
+                          <div className="space-y-1 w-full mr-2">
+                            <div className="flex justify-between">
+                              <Label className="text-xs">Pen Size: {penSize[0]}px</Label>
+                              <Label className="text-xs">Color:</Label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Slider
+                                value={penSize}
+                                onValueChange={setPenSize}
+                                min={1}
+                                max={5}
+                                step={0.5}
+                                className="w-full"
+                              />
+                              <Input
+                                type="color"
+                                value={typedSignatureColor}
+                                onChange={(e) => setTypedSignatureColor(e.target.value)}
+                                className="w-10 h-8 p-0"
+                              />
+                            </div>
                           </div>
-                          <Button variant="outline" onClick={clearSignature}>
+                          <Button variant="outline" onClick={clearSignature} className="h-full">
                             <Eraser className="h-4 w-4 mr-1" />
                             Clear
                           </Button>
                         </div>
                       </div>
-                      <Button onClick={saveSignature} className="w-full">
+                      <Button onClick={saveSignature} className="w-full bg-rose-600 hover:bg-rose-700 text-white">
                         <Save className="h-4 w-4 mr-2" />
                         Save Signature
                       </Button>
@@ -627,13 +643,14 @@ const SignPdfPage = () => {
                         placeholder="Enter your full name"
                         value={typedSignature}
                         onChange={(e) => setTypedSignature(e.target.value)}
+                        className="border-2 focus:border-rose-300"
                       />
                     </div>
                     
                     <div className="space-y-2">
                       <Label>Font Style</Label>
                       <Select value={typedSignatureFont} onValueChange={setTypedSignatureFont}>
-                        <SelectTrigger>
+                        <SelectTrigger className="border-2 focus:border-rose-300">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -653,6 +670,7 @@ const SignPdfPage = () => {
                         min={12}
                         max={72}
                         step={2}
+                        className="w-full"
                       />
                     </div>
                     
@@ -673,7 +691,7 @@ const SignPdfPage = () => {
                     </div>
                     
                     {typedSignature && (
-                      <div className="border rounded-lg p-4 bg-gray-50">
+                      <div className="border-2 rounded-lg p-4 bg-gray-50 shadow-inner">
                         <p 
                           className="text-center"
                           style={{ 
@@ -687,7 +705,7 @@ const SignPdfPage = () => {
                       </div>
                     )}
                     
-                    <Button onClick={saveSignature} className="w-full">
+                    <Button onClick={saveSignature} className="w-full bg-rose-600 hover:bg-rose-700 text-white">
                       <Save className="h-4 w-4 mr-2" />
                       Save Signature
                     </Button>
@@ -697,7 +715,7 @@ const SignPdfPage = () => {
                     <div className="space-y-2">
                       <Label>Upload Signature Image</Label>
                       <div 
-                        className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-rose-400 transition-colors cursor-pointer"
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-rose-400 transition-colors cursor-pointer bg-gray-50"
                         onClick={() => signatureImageRef.current?.click()}
                       >
                         <ImageIcon className="h-10 w-10 text-gray-400 mx-auto mb-3" />
@@ -713,7 +731,7 @@ const SignPdfPage = () => {
                       </div>
                       
                       {uploadedSignaturePreview && (
-                        <div className="mt-4 border rounded-lg p-4 bg-white">
+                        <div className="mt-4 border-2 rounded-lg p-4 bg-white shadow-inner">
                           <img 
                             src={uploadedSignaturePreview} 
                             alt="Uploaded signature" 
@@ -726,7 +744,7 @@ const SignPdfPage = () => {
                       )}
                       
                       {uploadedSignaturePreview && (
-                        <Button onClick={saveSignature} className="w-full">
+                        <Button onClick={saveSignature} className="w-full bg-rose-600 hover:bg-rose-700 text-white">
                           <Save className="h-4 w-4 mr-2" />
                           Use This Signature
                         </Button>
@@ -751,10 +769,10 @@ const SignPdfPage = () => {
 
           {/* Main Content - PDF Preview & Signing */}
           <div className="lg:col-span-3 space-y-6">
-            <Card>
-              <CardHeader>
+            <Card className="border border-gray-300 shadow-lg">
+              <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
                 <div className="flex items-center justify-between">
-                  <CardTitle>Sign Document</CardTitle>
+                  <CardTitle className="text-gray-800">Sign Document</CardTitle>
                   <Badge variant={signatureState.position ? "default" : "outline"} className={signatureState.position ? "bg-green-100 text-green-800 hover:bg-green-100" : ""}>
                     {signatureState.position ? "Signature Placed" : "Place Signature"}
                   </Badge>
@@ -763,7 +781,7 @@ const SignPdfPage = () => {
                   Page {currentPage} of {fileInfo.pages} - Drag your signature to position it on the document
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
                 <div className="bg-gray-100 p-4 rounded-lg flex items-center justify-center">
                   <div 
                     ref={containerRef} 
@@ -786,7 +804,7 @@ const SignPdfPage = () => {
                             onStop={handleDragStop}
                           >
                             <div 
-                              className={`absolute cursor-move border-2 ${signatureState.isDragging ? 'border-blue-500' : 'border-transparent hover:border-blue-300'}`}
+                              className={`absolute cursor-move border-2 ${signatureState.isDragging ? 'border-blue-500 bg-blue-50/20' : 'border-transparent hover:border-blue-300 hover:bg-blue-50/10'} rounded-md transition-colors duration-200`}
                               style={{ 
                                 width: signatureState.size.width, 
                                 height: signatureState.size.height,
@@ -821,14 +839,20 @@ const SignPdfPage = () => {
                               ) : null}
                               
                               {/* Resize handles */}
-                              <div className="absolute bottom-0 right-0 w-4 h-4 bg-blue-500 rounded-full cursor-se-resize"></div>
+                              <div className="absolute bottom-0 right-0 w-4 h-4 bg-blue-500 rounded-full cursor-se-resize shadow-md"></div>
+                              <div className="absolute top-0 left-0 w-4 h-4 bg-blue-500/80 rounded-full cursor-move shadow-md flex items-center justify-center">
+                                <Move className="h-2 w-2 text-white" />
+                              </div>
                             </div>
                           </Draggable>
                         )}
                       </>
                     ) : (
                       <div className="w-96 h-96 flex items-center justify-center text-gray-500">
-                        Loading PDF page...
+                        <div className="text-center">
+                          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-rose-500" />
+                          <p>Loading PDF page...</p>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -837,7 +861,7 @@ const SignPdfPage = () => {
                 <div className="flex justify-between mt-4">
                   <Button 
                     variant="outline" 
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                     onClick={() => {
                       setSignatureState(prev => ({ ...prev, position: null }));
                       if (file) renderPdfPage(file, currentPage, pdfScale);
@@ -849,7 +873,7 @@ const SignPdfPage = () => {
                   <Button 
                     onClick={signPdf} 
                     disabled={processing || !signatureState.data || !signatureState.position}
-                    className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700"
+                    className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-md"
                   >
                     {processing ? (
                       <>
@@ -893,10 +917,10 @@ const SignPdfPage = () => {
 
             {/* Signed File */}
             {signedFile && (
-              <Card className="border-green-200 bg-green-50">
+              <Card className="border-green-200 bg-green-50 shadow-md">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full">
+                    <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full shadow-inner">
                       <CheckCircle className="h-6 w-6 text-green-600" />
                     </div>
                     <div className="flex-1">
@@ -910,7 +934,7 @@ const SignPdfPage = () => {
                     </div>
                     <Button
                       onClick={downloadSigned}
-                      className="bg-green-600 hover:bg-green-700 text-white"
+                      className="bg-green-600 hover:bg-green-700 text-white shadow-md"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Download
