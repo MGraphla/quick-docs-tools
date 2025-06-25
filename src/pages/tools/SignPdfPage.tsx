@@ -1,6 +1,5 @@
-
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Upload, FileText, Download, Pen, Type, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, Settings, Zap, X, Save, Undo, Redo, Eraser, Trash2, Eye, Signature } from "lucide-react";
+import { Upload, FileText, Download, Pen, Type, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, Settings, Zap, X, Save, Undo, Redo, Eraser, Trash2, Eye, Signature, Move } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,7 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
+import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
+import { saveAs } from "file-saver";
+import SignatureCanvas from "react-signature-canvas";
+import Draggable from "react-draggable";
+import * as pdfjsLib from "pdfjs-dist";
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface SignedFile {
   name: string;
@@ -23,9 +29,9 @@ interface SignedFile {
 interface SignatureState {
   type: 'draw' | 'text' | 'image' | null;
   data: string | null;
-  canvas: HTMLCanvasElement | null;
   position: { x: number; y: number } | null;
   size: { width: number; height: number };
+  isDragging: boolean;
 }
 
 const SignPdfPage = () => {
@@ -38,26 +44,28 @@ const SignPdfPage = () => {
   const [typedSignatureColor, setTypedSignatureColor] = useState("#000000");
   const [uploadedSignature, setUploadedSignature] = useState<File | null>(null);
   const [uploadedSignaturePreview, setUploadedSignaturePreview] = useState<string | null>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pdfPageImage, setPdfPageImage] = useState<string | null>(null);
+  const [pdfScale, setPdfScale] = useState(1.5);
+  const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 });
   const [signatureState, setSignatureState] = useState<SignatureState>({
     type: null,
     data: null,
-    canvas: null,
     position: null,
-    size: { width: 150, height: 50 }
+    size: { width: 200, height: 100 },
+    isDragging: false
   });
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
   const [signedFile, setSignedFile] = useState<SignedFile | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const signatureImageRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const signatureCanvasRef = useRef<SignatureCanvas>(null);
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
-  const pdfProcessor = createPdfProcessor();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Load Google Fonts
   useEffect(() => {
@@ -72,6 +80,14 @@ const SignPdfPage = () => {
     };
   }, []);
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   const handleFileSelect = useCallback(async (selectedFiles: FileList | null) => {
     if (!selectedFiles || selectedFiles.length === 0) return;
     
@@ -84,51 +100,69 @@ const SignPdfPage = () => {
     const loadingToast = toast.loading("Loading PDF...");
     
     try {
-      const info = await pdfProcessor.loadPdf(selectedFile);
+      const arrayBuffer = await selectedFile.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
       setFile(selectedFile);
       setFileInfo({
         size: formatFileSize(selectedFile.size),
-        pages: info.pageCount
+        pages: pdf.numPages
       });
       setSignedFile(null);
       setCurrentPage(1);
       setSignatureState({
         type: null,
         data: null,
-        canvas: null,
         position: null,
-        size: { width: 150, height: 50 }
+        size: { width: 200, height: 100 },
+        isDragging: false
       });
       
       // Render first page
-      await renderCurrentPage(selectedFile, 1);
+      await renderPdfPage(selectedFile, 1, pdfScale);
       
-      toast.success(`PDF loaded: ${info.pageCount} pages`);
+      toast.success(`PDF loaded: ${pdf.numPages} pages`);
     } catch (error) {
       console.error('Error loading PDF:', error);
       toast.error(error instanceof Error ? error.message : "Failed to load PDF");
     } finally {
       toast.dismiss(loadingToast);
     }
-  }, []);
+  }, [pdfScale]);
 
-  const renderCurrentPage = async (pdfFile: File, pageNumber: number) => {
+  const renderPdfPage = async (pdfFile: File, pageNumber: number, scale: number) => {
     try {
-      const pageImage = await pdfProcessor.renderPdfPage(pdfFile, pageNumber, 1.5);
+      const arrayBuffer = await pdfFile.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const page = await pdf.getPage(pageNumber);
+      const viewport = page.getViewport({ scale });
+      
+      setPdfDimensions({ width: viewport.width, height: viewport.height });
+      
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d')!;
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+
+      const pageImage = canvas.toDataURL('image/jpeg', 0.95);
       setPdfPageImage(pageImage);
       
       // Update canvas with the rendered page
       if (pdfCanvasRef.current) {
         const canvas = pdfCanvasRef.current;
         const ctx = canvas.getContext('2d');
-        const img = new Image();
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
         
+        const img = new Image();
         img.onload = () => {
-          canvas.width = img.width;
-          canvas.height = img.height;
           ctx?.drawImage(img, 0, 0);
         };
-        
         img.src = pageImage;
       }
     } catch (error) {
@@ -176,58 +210,51 @@ const SignPdfPage = () => {
     }
   };
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    setIsDrawing(true);
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.beginPath();
-        ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
-        ctx.strokeStyle = typedSignatureColor;
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-      }
-    }
-  };
-
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-        ctx.stroke();
-      }
-    }
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
-    if (canvasRef.current) {
+  const clearSignature = () => {
+    if (signatureCanvasRef.current) {
+      signatureCanvasRef.current.clear();
       setSignatureState(prev => ({
         ...prev,
-        type: 'draw',
-        canvas: canvasRef.current
+        type: null,
+        data: null
       }));
     }
   };
 
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const saveSignature = () => {
+    if (signatureType === "draw") {
+      if (signatureCanvasRef.current && !signatureCanvasRef.current.isEmpty()) {
+        const signatureData = signatureCanvasRef.current.toDataURL('image/png');
         setSignatureState(prev => ({
           ...prev,
-          type: null,
-          canvas: null
+          type: 'draw',
+          data: signatureData
         }));
+        toast.success("Signature saved! Now place it on the document.");
+      } else {
+        toast.error("Please draw your signature first");
+      }
+    } else if (signatureType === "text") {
+      if (typedSignature.trim()) {
+        setSignatureState(prev => ({
+          ...prev,
+          type: 'text',
+          data: typedSignature
+        }));
+        toast.success("Signature saved! Now place it on the document.");
+      } else {
+        toast.error("Please enter your signature text");
+      }
+    } else if (signatureType === "upload") {
+      if (uploadedSignaturePreview) {
+        setSignatureState(prev => ({
+          ...prev,
+          type: 'image',
+          data: uploadedSignaturePreview
+        }));
+        toast.success("Signature saved! Now place it on the document.");
+      } else {
+        toast.error("Please upload a signature image");
       }
     }
   };
@@ -243,48 +270,36 @@ const SignPdfPage = () => {
   };
 
   useEffect(() => {
-    updateTypedSignature();
+    if (signatureType === "text") {
+      updateTypedSignature();
+    }
   }, [typedSignature, typedSignatureFont, typedSignatureSize, typedSignatureColor]);
 
-  const placeSignature = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!pdfCanvasRef.current || !signatureState.type) {
-      toast.error("Please create a signature first");
-      return;
-    }
-    
-    const rect = pdfCanvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
+  const handleDragStart = () => {
+    setSignatureState(prev => ({ ...prev, isDragging: true }));
+  };
+
+  const handleDragStop = (e: any, data: { x: number; y: number }) => {
     setSignatureState(prev => ({
       ...prev,
-      position: { x, y }
+      position: { x: data.x, y: data.y },
+      isDragging: false
     }));
+  };
+
+  const handleResizeSignature = (newSize: { width: number; height: number }) => {
+    setSignatureState(prev => ({
+      ...prev,
+      size: newSize
+    }));
+  };
+
+  const changePage = async (newPage: number) => {
+    if (!fileInfo || !file) return;
+    if (newPage < 1 || newPage > fileInfo.pages) return;
     
-    // Visual feedback on the PDF canvas
-    const ctx = pdfCanvasRef.current.getContext('2d');
-    if (ctx && pdfPageImage) {
-      // Redraw the page
-      const img = new Image();
-      img.onload = () => {
-        ctx.clearRect(0, 0, pdfCanvasRef.current!.width, pdfCanvasRef.current!.height);
-        ctx.drawImage(img, 0, 0);
-        
-        // Draw signature placeholder
-        ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
-        ctx.fillRect(x - signatureState.size.width/2, y - signatureState.size.height/2, signatureState.size.width, signatureState.size.height);
-        ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
-        ctx.strokeRect(x - signatureState.size.width/2, y - signatureState.size.height/2, signatureState.size.width, signatureState.size.height);
-        
-        ctx.font = '12px Arial';
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.textAlign = 'center';
-        ctx.fillText('Signature will appear here', x, y + 5);
-      };
-      img.src = pdfPageImage;
-    }
-    
-    toast.success("Signature positioned! Click 'Sign Document' to apply.");
+    setCurrentPage(newPage);
+    await renderPdfPage(file, newPage, pdfScale);
   };
 
   const signPdf = async () => {
@@ -293,13 +308,13 @@ const SignPdfPage = () => {
       return;
     }
 
-    if (!signatureState.position) {
-      toast.error("Please place your signature on the document");
+    if (!signatureState.type || !signatureState.data) {
+      toast.error("Please create a signature first");
       return;
     }
 
-    if (!signatureState.type) {
-      toast.error("Please create a signature");
+    if (!signatureState.position) {
+      toast.error("Please place your signature on the document");
       return;
     }
 
@@ -309,11 +324,10 @@ const SignPdfPage = () => {
 
     try {
       const steps = [
-        { message: "Analyzing PDF structure...", progress: 15 },
+        { message: "Loading PDF document...", progress: 15 },
         { message: "Processing signature...", progress: 30 },
         { message: "Applying signature to document...", progress: 50 },
-        { message: "Validating signed document...", progress: 70 },
-        { message: "Finalizing document...", progress: 90 }
+        { message: "Finalizing signed document...", progress: 80 }
       ];
 
       for (const step of steps) {
@@ -322,27 +336,99 @@ const SignPdfPage = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      const signatureOptions = {
-        type: signatureState.type,
-        signatureData: signatureState.data,
-        canvas: signatureState.canvas,
-        x: signatureState.position.x - signatureState.size.width/2,
-        y: signatureState.position.y - signatureState.size.height/2,
-        width: signatureState.size.width,
-        height: signatureState.size.height,
-        pageNumber: currentPage,
-        text: signatureState.type === 'text' ? typedSignature : undefined,
-        fontSize: typedSignatureSize[0],
-        color: typedSignatureColor,
-        fontFamily: typedSignatureFont
-      };
-
-      const signedData = await pdfProcessor.addSignature(file, signatureOptions);
+      // Load the PDF document
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      
+      // Get the page to add the signature to
+      const pages = pdfDoc.getPages();
+      const page = pages[currentPage - 1];
+      
+      // Calculate the position based on the PDF dimensions and the signature position
+      const { width, height } = page.getSize();
+      
+      // Calculate the position relative to the PDF page
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      const canvasRect = pdfCanvasRef.current?.getBoundingClientRect();
+      
+      if (!containerRect || !canvasRect) {
+        throw new Error("Could not determine container dimensions");
+      }
+      
+      // Calculate the scale factor between the displayed PDF and the actual PDF
+      const scaleX = width / pdfDimensions.width;
+      const scaleY = height / pdfDimensions.height;
+      
+      // Calculate the position in PDF coordinates
+      const pdfX = signatureState.position.x * scaleX;
+      const pdfY = height - (signatureState.position.y * scaleY) - (signatureState.size.height * scaleY / 2);
+      
+      // Apply the signature based on its type
+      if (signatureState.type === 'image' || signatureState.type === 'draw') {
+        // For image or drawn signature, embed the image
+        const signatureImage = signatureState.data;
+        if (!signatureImage) throw new Error("Signature data is missing");
+        
+        // Convert data URL to Uint8Array
+        const base64Data = signatureImage.split(',')[1];
+        const signatureBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+        
+        // Embed the image
+        const signatureImageEmbed = await pdfDoc.embedPng(signatureBytes);
+        
+        // Calculate dimensions
+        const signatureWidth = signatureState.size.width * scaleX;
+        const signatureHeight = signatureState.size.height * scaleY;
+        
+        // Draw the image on the page
+        page.drawImage(signatureImageEmbed, {
+          x: pdfX,
+          y: pdfY,
+          width: signatureWidth,
+          height: signatureHeight
+        });
+      } else if (signatureState.type === 'text') {
+        // For text signature, add text
+        // Select font based on the chosen font family
+        let font;
+        try {
+          if (typedSignatureFont === 'Helvetica') {
+            font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+          } else {
+            // For custom fonts, fall back to Helvetica in this implementation
+            font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+          }
+        } catch (error) {
+          console.error("Error embedding font:", error);
+          font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        }
+        
+        // Parse the color
+        const r = parseInt(typedSignatureColor.slice(1, 3), 16) / 255;
+        const g = parseInt(typedSignatureColor.slice(3, 5), 16) / 255;
+        const b = parseInt(typedSignatureColor.slice(5, 7), 16) / 255;
+        
+        // Draw the text
+        page.drawText(typedSignature, {
+          x: pdfX,
+          y: pdfY,
+          size: typedSignatureSize[0] * scaleY,
+          font,
+          color: rgb(r, g, b)
+        });
+      }
+      
+      // Save the PDF
+      const pdfBytes = await pdfDoc.save();
+      
+      // Create a blob and URL for download
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
       
       setSignedFile({
         name: `signed-${file.name}`,
-        url: pdfProcessor.createDownloadLink(signedData, `signed-${file.name}`),
-        size: formatFileSize(signedData.length)
+        url,
+        size: formatFileSize(blob.size)
       });
       
       setProgress(100);
@@ -362,20 +448,8 @@ const SignPdfPage = () => {
   const downloadSigned = () => {
     if (!signedFile) return;
     
-    const link = document.createElement('a');
-    link.href = signedFile.url;
-    link.download = signedFile.name;
-    link.click();
+    saveAs(signedFile.url, signedFile.name);
     toast.success(`Downloaded ${signedFile.name}`);
-  };
-
-  const changePage = async (newPage: number) => {
-    if (!fileInfo || !file) return;
-    if (newPage < 1 || newPage > fileInfo.pages) return;
-    
-    setCurrentPage(newPage);
-    setSignatureState(prev => ({ ...prev, position: null }));
-    await renderCurrentPage(file, newPage);
   };
 
   return (
@@ -513,15 +587,14 @@ const SignPdfPage = () => {
                     <div className="space-y-2">
                       <Label>Draw Your Signature</Label>
                       <div className="border rounded-lg p-4 bg-white">
-                        <canvas
-                          ref={canvasRef}
-                          width={280}
-                          height={120}
-                          className="border border-gray-200 rounded cursor-crosshair w-full"
-                          onMouseDown={startDrawing}
-                          onMouseMove={draw}
-                          onMouseUp={stopDrawing}
-                          onMouseLeave={stopDrawing}
+                        <SignatureCanvas
+                          ref={signatureCanvasRef}
+                          penColor={typedSignatureColor}
+                          canvasProps={{
+                            width: 280,
+                            height: 120,
+                            className: "border border-gray-200 rounded cursor-crosshair w-full"
+                          }}
                         />
                         <div className="flex justify-between mt-2">
                           <div className="flex items-center gap-2">
@@ -533,12 +606,16 @@ const SignPdfPage = () => {
                               className="w-10 h-8 p-0"
                             />
                           </div>
-                          <Button variant="outline" onClick={clearCanvas}>
+                          <Button variant="outline" onClick={clearSignature}>
                             <Eraser className="h-4 w-4 mr-1" />
                             Clear
                           </Button>
                         </div>
                       </div>
+                      <Button onClick={saveSignature} className="w-full">
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Signature
+                      </Button>
                     </div>
                   </TabsContent>
                   
@@ -608,6 +685,11 @@ const SignPdfPage = () => {
                         </p>
                       </div>
                     )}
+                    
+                    <Button onClick={saveSignature} className="w-full">
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Signature
+                    </Button>
                   </TabsContent>
                   
                   <TabsContent value="upload" className="space-y-4">
@@ -641,6 +723,13 @@ const SignPdfPage = () => {
                           </p>
                         </div>
                       )}
+                      
+                      {uploadedSignaturePreview && (
+                        <Button onClick={saveSignature} className="w-full">
+                          <Save className="h-4 w-4 mr-2" />
+                          Use This Signature
+                        </Button>
+                      )}
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -649,7 +738,9 @@ const SignPdfPage = () => {
                   <Alert className="bg-blue-50 border-blue-200">
                     <AlertCircle className="h-4 w-4 text-blue-600" />
                     <AlertDescription className="text-blue-700">
-                      Create your signature, then click on the document where you want to place it
+                      {signatureState.data 
+                        ? "Signature created! Now drag and position it on the document." 
+                        : "Create your signature, then drag it to position on the document"}
                     </AlertDescription>
                   </Alert>
                 </div>
@@ -668,18 +759,72 @@ const SignPdfPage = () => {
                   </Badge>
                 </div>
                 <CardDescription>
-                  Page {currentPage} of {fileInfo.pages} - Click on the document where you want to add your signature
+                  Page {currentPage} of {fileInfo.pages} - Drag your signature to position it on the document
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="bg-gray-100 p-4 rounded-lg flex items-center justify-center">
-                  <div className="bg-white shadow-lg rounded-lg overflow-hidden max-w-full">
+                  <div 
+                    ref={containerRef} 
+                    className="bg-white shadow-lg rounded-lg overflow-hidden max-w-full relative"
+                    style={{ width: pdfDimensions.width, height: pdfDimensions.height }}
+                  >
                     {pdfPageImage ? (
-                      <canvas 
-                        ref={pdfCanvasRef}
-                        className="max-w-full h-auto border cursor-crosshair"
-                        onClick={placeSignature}
-                      />
+                      <>
+                        <canvas 
+                          ref={pdfCanvasRef}
+                          className="max-w-full h-auto border"
+                        />
+                        
+                        {/* Draggable Signature */}
+                        {signatureState.data && (
+                          <Draggable
+                            defaultPosition={signatureState.position || { x: pdfDimensions.width / 2 - signatureState.size.width / 2, y: pdfDimensions.height / 2 - signatureState.size.height / 2 }}
+                            bounds="parent"
+                            onStart={handleDragStart}
+                            onStop={handleDragStop}
+                          >
+                            <div 
+                              className={`absolute cursor-move border-2 ${signatureState.isDragging ? 'border-blue-500' : 'border-transparent hover:border-blue-300'}`}
+                              style={{ 
+                                width: signatureState.size.width, 
+                                height: signatureState.size.height,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              {signatureState.type === 'draw' || signatureState.type === 'image' ? (
+                                <img 
+                                  src={signatureState.data || ''} 
+                                  alt="Signature" 
+                                  style={{ 
+                                    maxWidth: '100%', 
+                                    maxHeight: '100%',
+                                    pointerEvents: 'none'
+                                  }} 
+                                />
+                              ) : signatureState.type === 'text' ? (
+                                <div 
+                                  style={{ 
+                                    fontFamily: typedSignatureFont === 'Helvetica' ? 'Arial, sans-serif' : typedSignatureFont, 
+                                    fontSize: `${typedSignatureSize[0]}px`,
+                                    color: typedSignatureColor,
+                                    pointerEvents: 'none',
+                                    textAlign: 'center',
+                                    width: '100%'
+                                  }}
+                                >
+                                  {typedSignature}
+                                </div>
+                              ) : null}
+                              
+                              {/* Resize handles */}
+                              <div className="absolute bottom-0 right-0 w-4 h-4 bg-blue-500 rounded-full cursor-se-resize"></div>
+                            </div>
+                          </Draggable>
+                        )}
+                      </>
                     ) : (
                       <div className="w-96 h-96 flex items-center justify-center text-gray-500">
                         Loading PDF page...
@@ -694,7 +839,7 @@ const SignPdfPage = () => {
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     onClick={() => {
                       setSignatureState(prev => ({ ...prev, position: null }));
-                      if (file) renderCurrentPage(file, currentPage);
+                      if (file) renderPdfPage(file, currentPage, pdfScale);
                     }}
                   >
                     <Trash2 className="h-4 w-4 mr-1" />
@@ -702,7 +847,7 @@ const SignPdfPage = () => {
                   </Button>
                   <Button 
                     onClick={signPdf} 
-                    disabled={processing || !signatureState.position || !signatureState.type}
+                    disabled={processing || !signatureState.data || !signatureState.position}
                     className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700"
                   >
                     {processing ? (
@@ -782,7 +927,7 @@ const SignPdfPage = () => {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <strong>How to sign a PDF:</strong> Upload a PDF file, create your signature by drawing, typing, or uploading an image, click on the document where you want to place your signature, then click "Sign Document" to apply your signature.
+            <strong>How to sign a PDF:</strong> Upload a PDF file, create your signature by drawing, typing, or uploading an image, drag to position your signature on the document, then click "Sign Document" to apply your signature.
           </AlertDescription>
         </Alert>
       )}
