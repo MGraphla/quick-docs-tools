@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useRef } from "react";
 import { FileText, Upload, Type, Square, Circle, Highlighter, ImageIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,7 @@ export const EditToolsSidebar = ({
   onPageChange,
   onImageUpload
 }: EditToolsSidebarProps) => {
-  const imageInputRef = useState<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="lg:col-span-1 space-y-6">

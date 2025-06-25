@@ -83,7 +83,7 @@ export const usePdfEditor = () => {
       color: textColor,
       width: editTool === 'highlight' ? 100 : editTool === 'shape' ? 80 : undefined,
       height: editTool === 'highlight' ? 20 : editTool === 'shape' ? 80 : undefined,
-      shapeType: editTool === 'shape' ? (editTool === 'rectangle' ? 'rectangle' : 'circle') : undefined,
+      shapeType: editTool === 'rectangle' ? 'rectangle' : editTool === 'circle' ? 'circle' : undefined,
       imageData: editTool === 'image' ? selectedImage : undefined
     };
     
