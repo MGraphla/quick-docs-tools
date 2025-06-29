@@ -1146,6 +1146,7 @@ const TextEditorPage = () => {
                   formats={formats}
                   placeholder="Start typing your document here..."
                   className="h-[550px] border-none"
+                  style={{ height: '550px' }}
                 />
               </div>
             </div>
