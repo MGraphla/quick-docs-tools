@@ -5,7 +5,7 @@ import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
 
-// Set up PDF.js worker using the recommended approach for Vite
+// Set up PDF.js worker using the correct approach for Vite
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).toString();
 
 export interface PdfInfo {
