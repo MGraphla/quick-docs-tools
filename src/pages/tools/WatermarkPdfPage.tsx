@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
 
@@ -39,7 +40,7 @@ const WatermarkPdfPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageImage, setPageImage] = useState<string | null>(null);
   const [isMobileView, setIsMobileView] = useState(false);
-  const [showMobileTools, setShowMobileTools] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -295,32 +296,254 @@ const WatermarkPdfPage = () => {
           {/* Mobile Tools Toggle Button */}
           {isMobileView && (
             <div className="fixed bottom-4 right-4 z-50">
-              <Button 
-                onClick={() => setShowMobileTools(!showMobileTools)} 
-                className="rounded-full w-14 h-14 shadow-lg bg-blue-600 hover:bg-blue-700"
-              >
-                <Droplets className="h-6 w-6" />
-              </Button>
+              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button 
+                    className="rounded-full w-14 h-14 shadow-lg bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Droplets className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="h-[80vh] rounded-t-xl">
+                  <SheetHeader className="mb-4">
+                    <SheetTitle className="flex items-center gap-2">
+                      <Droplets className="h-5 w-5 text-blue-600" />
+                      Watermark Settings
+                    </SheetTitle>
+                  </SheetHeader>
+                  <div className="overflow-y-auto pr-1 pb-16">
+                    {/* Document Info */}
+                    <Card className="shadow-sm hover:shadow-md transition-shadow mb-4">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <FileText className="h-5 w-5 text-blue-600" />
+                          Document Info
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-3 bg-blue-50 p-3 rounded-lg">
+                            <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-lg">
+                              <FileText className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-gray-900 truncate">{file.name}</h4>
+                              <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <span>{fileInfo.pages} pages</span>
+                                <span>•</span>
+                                <span>{fileInfo.size}</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => changePage(currentPage - 1)}
+                              disabled={currentPage <= 1}
+                              className="h-8"
+                            >
+                              Previous
+                            </Button>
+                            <div className="text-sm">
+                              Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{fileInfo.pages}</span>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => changePage(currentPage + 1)}
+                              disabled={currentPage >= fileInfo.pages}
+                              className="h-8"
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Watermark Settings */}
+                    <Card className="shadow-sm hover:shadow-md transition-shadow">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Droplets className="h-5 w-5 text-blue-600" />
+                          Watermark Settings
+                        </CardTitle>
+                        <CardDescription>
+                          Configure your watermark appearance and position
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Tabs value={watermarkType} onValueChange={setWatermarkType}>
+                          <TabsList className="grid grid-cols-2 mb-6 w-full">
+                            <TabsTrigger value="text" className="flex items-center gap-1">
+                              <Type className="h-4 w-4" />
+                              <span className="hidden sm:inline">Text Watermark</span>
+                              <span className="sm:hidden">Text</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="image" className="flex items-center gap-1">
+                              <ImageIcon className="h-4 w-4" />
+                              <span className="hidden sm:inline">Image Watermark</span>
+                              <span className="sm:hidden">Image</span>
+                            </TabsTrigger>
+                          </TabsList>
+                          
+                          <TabsContent value="text" className="space-y-6">
+                            <div className="space-y-2">
+                              <Label>Watermark Text</Label>
+                              <Input
+                                placeholder="Enter watermark text"
+                                value={textWatermark}
+                                onChange={(e) => setTextWatermark(e.target.value)}
+                                className="border-blue-200 focus:border-blue-400"
+                              />
+                            </div>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Font Size: {fontSize[0]}px</Label>
+                                <Slider
+                                  value={fontSize}
+                                  onValueChange={setFontSize}
+                                  min={8}
+                                  max={72}
+                                  step={2}
+                                />
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label>Text Color</Label>
+                                <div className="flex gap-2">
+                                  <div 
+                                    className="w-10 h-10 rounded-md border"
+                                    style={{ backgroundColor: textColor }}
+                                  />
+                                  <Input
+                                    type="color"
+                                    value={textColor}
+                                    onChange={(e) => setTextColor(e.target.value)}
+                                    className="w-full h-10"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {textWatermark && (
+                              <div className="border rounded-lg p-4 bg-gray-50">
+                                <p className="text-center font-medium mb-2">Preview:</p>
+                                <p 
+                                  className="text-center"
+                                  style={{ 
+                                    fontSize: `${fontSize[0]}px`,
+                                    color: textColor,
+                                    opacity: opacity[0] / 100,
+                                    transform: `rotate(${rotation[0]}deg)`
+                                  }}
+                                >
+                                  {textWatermark}
+                                </p>
+                              </div>
+                            )}
+                          </TabsContent>
+                          
+                          <TabsContent value="image" className="space-y-6">
+                            <div className="space-y-2">
+                              <Label>Upload Watermark Image</Label>
+                              <div 
+                                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer"
+                                onClick={() => imageInputRef.current?.click()}
+                              >
+                                <ImageIcon className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                                <p className="text-sm text-gray-600 mb-2">Click to upload watermark image</p>
+                                <p className="text-xs text-gray-500">Supports JPG, PNG, GIF</p>
+                                <input
+                                  ref={imageInputRef}
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleImageSelect}
+                                  className="hidden"
+                                />
+                              </div>
+                              
+                              {imagePreview && (
+                                <div className="mt-4 border rounded-lg p-4 bg-white">
+                                  <p className="text-center font-medium mb-2">Preview:</p>
+                                  <div className="flex justify-center">
+                                    <img 
+                                      src={imagePreview} 
+                                      alt="Watermark preview" 
+                                      className="max-h-32 rounded"
+                                      style={{
+                                        opacity: opacity[0] / 100,
+                                        transform: `rotate(${rotation[0]}deg)`
+                                      }}
+                                    />
+                                  </div>
+                                  <p className="text-xs text-center mt-2 text-gray-500">
+                                    {imageWatermark?.name}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+
+                        {/* Common Settings */}
+                        <div className="mt-6 space-y-6 border-t pt-6">
+                          <h4 className="font-medium text-gray-900">Position & Appearance</h4>
+                          
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Position</Label>
+                              <Select value={position} onValueChange={setPosition}>
+                                <SelectTrigger className="border-blue-200 focus:border-blue-400">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="center">Center</SelectItem>
+                                  <SelectItem value="top-left">Top Left</SelectItem>
+                                  <SelectItem value="top-right">Top Right</SelectItem>
+                                  <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                                  <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Opacity: {opacity[0]}%</Label>
+                              <Slider
+                                value={opacity}
+                                onValueChange={setOpacity}
+                                min={10}
+                                max={100}
+                                step={5}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>Rotation: {rotation[0]}°</Label>
+                            <Slider
+                              value={rotation}
+                              onValueChange={setRotation}
+                              min={-45}
+                              max={45}
+                              step={5}
+                            />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Column - File Info & Watermark Settings - Shown on desktop or when toggled on mobile */}
-            <div className={`lg:col-span-5 space-y-6 ${isMobileView ? (showMobileTools ? 'fixed inset-0 z-40 bg-white/95 p-4 overflow-auto' : 'hidden') : ''}`}>
-              {isMobileView && showMobileTools && (
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold">Watermark Settings</h3>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setShowMobileTools(false)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <AlertCircle className="h-5 w-5" />
-                  </Button>
-                </div>
-              )}
-              
+            {/* Left Column - File Info & Watermark Settings - Shown on desktop */}
+            <div className="lg:col-span-5 space-y-6 hidden lg:block">
               <Card className="shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">

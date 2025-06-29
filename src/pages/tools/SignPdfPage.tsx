@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
 import SignatureCanvas from 'react-signature-canvas';
@@ -26,6 +27,12 @@ interface SignaturePosition {
   width: number;
   height: number;
   pageNumber: number;
+  type: 'draw' | 'text' | 'image';
+  data?: string;
+  text?: string;
+  color?: string;
+  fontSize?: number;
+  fontFamily?: string;
 }
 
 const SignPdfPage = () => {
@@ -48,7 +55,7 @@ const SignPdfPage = () => {
   const [signatureWidth, setSignatureWidth] = useState([150]);
   const [signatureHeight, setSignatureHeight] = useState([50]);
   const [isMobileView, setIsMobileView] = useState(false);
-  const [showMobileTools, setShowMobileTools] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -159,6 +166,22 @@ const SignPdfPage = () => {
   const addSignature = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!file || !pdfContainerRef.current) return;
     
+    // Validate signature data
+    if (signatureType === 'draw' && signaturePadRef.current?.isEmpty()) {
+      toast.error("Please draw your signature before adding it");
+      return;
+    }
+    
+    if (signatureType === 'text' && !textSignature.trim()) {
+      toast.error("Please enter your signature text");
+      return;
+    }
+    
+    if (signatureType === 'image' && !signatureImage) {
+      toast.error("Please upload a signature image");
+      return;
+    }
+    
     const rect = pdfContainerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -167,13 +190,27 @@ const SignPdfPage = () => {
     const pdfX = (x / rect.width) * 595; // Standard PDF width
     const pdfY = (y / rect.height) * 842; // Standard PDF height
     
+    // Get signature data based on type
+    let signatureData = null;
+    if (signatureType === 'draw' && signaturePadRef.current) {
+      signatureData = signaturePadRef.current.toDataURL('image/png');
+    } else if (signatureType === 'image') {
+      signatureData = signatureImage;
+    }
+    
     const newPosition: SignaturePosition = {
       id: generateId(),
       x: pdfX,
       y: pdfY,
       width: signatureWidth[0],
       height: signatureHeight[0],
-      pageNumber: currentPage
+      pageNumber: currentPage,
+      type: signatureType,
+      data: signatureData || undefined,
+      text: signatureType === 'text' ? textSignature : undefined,
+      color: textColor,
+      fontSize: fontSize[0],
+      fontFamily: fontFamily
     };
     
     setSignaturePositions(prev => [...prev, newPosition]);
@@ -181,7 +218,7 @@ const SignPdfPage = () => {
     
     // Close mobile tools panel after adding a signature on mobile
     if (isMobileView) {
-      setShowMobileTools(false);
+      setSheetOpen(false);
     }
   };
 
@@ -213,21 +250,6 @@ const SignPdfPage = () => {
       return;
     }
 
-    if (signatureType === 'draw' && signaturePadRef.current && signaturePadRef.current.isEmpty()) {
-      toast.error("Please draw your signature before saving");
-      return;
-    }
-
-    if (signatureType === 'text' && !textSignature.trim()) {
-      toast.error("Please enter your signature text");
-      return;
-    }
-
-    if (signatureType === 'image' && !signatureImage) {
-      toast.error("Please upload a signature image");
-      return;
-    }
-
     setProcessing(true);
     setProgress(0);
     setProgressMessage("Preparing to add signatures...");
@@ -251,28 +273,19 @@ const SignPdfPage = () => {
       let currentPdfBytes = await file.arrayBuffer();
       
       for (const position of signaturePositions) {
-        let signatureData = null;
-        
-        // Get signature data based on type
-        if (signatureType === 'draw' && signaturePadRef.current) {
-          signatureData = signaturePadRef.current.toDataURL('image/png');
-        } else if (signatureType === 'image' && signatureImage) {
-          signatureData = signatureImage;
-        }
-        
         const signatureOptions = {
-          type: signatureType,
+          type: position.type,
           x: position.x,
           y: position.y,
           width: position.width,
           height: position.height,
           pageNumber: position.pageNumber,
-          text: signatureType === 'text' ? textSignature : undefined,
-          fontSize: fontSize[0],
-          color: textColor,
-          fontFamily,
-          signatureData: signatureType !== 'text' ? signatureData : undefined,
-          canvas: signatureType === 'draw' ? signaturePadRef.current?.getCanvas() : undefined
+          text: position.text,
+          fontSize: position.fontSize,
+          color: position.color,
+          fontFamily: position.fontFamily,
+          signatureData: position.data,
+          canvas: position.type === 'draw' ? signaturePadRef.current?.getCanvas() : undefined
         };
 
         const pdfFile = new File([currentPdfBytes], file.name, { type: 'application/pdf' });
@@ -372,32 +385,239 @@ const SignPdfPage = () => {
           {/* Mobile Tools Toggle Button */}
           {isMobileView && (
             <div className="fixed bottom-4 right-4 z-50">
-              <Button 
-                onClick={() => setShowMobileTools(!showMobileTools)} 
-                className="rounded-full w-14 h-14 shadow-lg bg-blue-600 hover:bg-blue-700"
-              >
-                <Signature className="h-6 w-6" />
-              </Button>
+              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button 
+                    className="rounded-full w-14 h-14 shadow-lg bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Signature className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="h-[80vh] rounded-t-xl">
+                  <SheetHeader className="mb-4">
+                    <SheetTitle className="flex items-center gap-2">
+                      <Signature className="h-5 w-5 text-blue-600" />
+                      Signature Tools
+                    </SheetTitle>
+                  </SheetHeader>
+                  <div className="overflow-y-auto pr-1 pb-16">
+                    {/* Document Info */}
+                    <Card className="shadow-sm hover:shadow-md transition-shadow mb-4">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <FileText className="h-5 w-5 text-blue-600" />
+                          Document Info
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-3 bg-blue-50 p-3 rounded-lg">
+                            <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-lg">
+                              <FileText className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-gray-900 truncate">{file.name}</h4>
+                              <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <span>{fileInfo.pages} pages</span>
+                                <span>•</span>
+                                <span>{fileInfo.size}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => changePage(currentPage - 1)}
+                              disabled={currentPage <= 1}
+                              className="h-8"
+                            >
+                              Previous
+                            </Button>
+                            <div className="text-sm">
+                              Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{fileInfo.pages}</span>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => changePage(currentPage + 1)}
+                              disabled={currentPage >= fileInfo.pages}
+                              className="h-8"
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Signature Tools */}
+                    <Card className="shadow-sm hover:shadow-md transition-shadow">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Signature className="h-5 w-5 text-blue-600" />
+                          Signature Tools
+                        </CardTitle>
+                        <CardDescription>
+                          Choose how you want to add your signature
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Tabs value={signatureType} onValueChange={(value) => setSignatureType(value as 'draw' | 'text' | 'image')}>
+                          <TabsList className="grid grid-cols-3 mb-4 w-full">
+                            <TabsTrigger value="draw" className="text-sm">Draw</TabsTrigger>
+                            <TabsTrigger value="text" className="text-sm">Type</TabsTrigger>
+                            <TabsTrigger value="image" className="text-sm">Upload</TabsTrigger>
+                          </TabsList>
+                          
+                          <TabsContent value="draw" className="space-y-4">
+                            <div className="border rounded-lg p-2 bg-white">
+                              <SignatureCanvas
+                                ref={signaturePadRef}
+                                canvasProps={{
+                                  width: 280,
+                                  height: 150,
+                                  className: 'signature-canvas w-full h-full border border-gray-200 rounded'
+                                }}
+                                backgroundColor="white"
+                              />
+                            </div>
+                            <Button variant="outline" size="sm" onClick={clearSignaturePad} className="w-full">
+                              Clear Signature Pad
+                            </Button>
+                          </TabsContent>
+                          
+                          <TabsContent value="text" className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Signature Text</Label>
+                              <Input
+                                placeholder="Enter your signature"
+                                value={textSignature}
+                                onChange={(e) => setTextSignature(e.target.value)}
+                                className="border-blue-200 focus:border-blue-400"
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Font Family</Label>
+                              <Select value={fontFamily} onValueChange={setFontFamily}>
+                                <SelectTrigger className="border-blue-200 focus:border-blue-400">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Arial">Arial</SelectItem>
+                                  <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                                  <SelectItem value="Courier New">Courier New</SelectItem>
+                                  <SelectItem value="Georgia">Georgia</SelectItem>
+                                  <SelectItem value="Verdana">Verdana</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Font Size: {fontSize[0]}px</Label>
+                              <Slider
+                                value={fontSize}
+                                onValueChange={setFontSize}
+                                min={12}
+                                max={48}
+                                step={1}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Text Color</Label>
+                              <div className="flex gap-2">
+                                <div 
+                                  className="w-10 h-10 rounded-md border"
+                                  style={{ backgroundColor: textColor }}
+                                />
+                                <Input
+                                  type="color"
+                                  value={textColor}
+                                  onChange={(e) => setTextColor(e.target.value)}
+                                  className="w-full h-10"
+                                />
+                              </div>
+                            </div>
+                            
+                            {textSignature && (
+                              <div className="p-3 bg-gray-50 rounded-lg">
+                                <p className="text-sm text-gray-600 mb-1">Preview:</p>
+                                <p 
+                                  className="text-center"
+                                  style={{ 
+                                    fontFamily, 
+                                    fontSize: `${fontSize[0]}px`,
+                                    color: textColor,
+                                    fontWeight: fontFamily.includes('Script') || fontFamily.includes('Pacifico') || fontFamily.includes('Satisfy') ? 'normal' : 'bold'
+                                  }}
+                                >
+                                  {textSignature}
+                                </p>
+                              </div>
+                            )}
+                          </TabsContent>
+                          
+                          <TabsContent value="image" className="space-y-4">
+                            <Button
+                              variant="outline"
+                              onClick={() => imageInputRef.current?.click()}
+                              className="w-full border-blue-200 hover:border-blue-400"
+                            >
+                              <ImageIcon className="h-4 w-4 mr-2" />
+                              Upload Signature Image
+                            </Button>
+                            <input
+                              ref={imageInputRef}
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageUpload}
+                              className="hidden"
+                            />
+                            {signatureImage && (
+                              <div className="p-2 bg-gray-50 rounded-lg">
+                                <img src={signatureImage} alt="Signature" className="max-w-full h-20 object-contain mx-auto" />
+                              </div>
+                            )}
+                          </TabsContent>
+                        </Tabs>
+                        
+                        <div className="mt-4 space-y-2">
+                          <Label>Signature Size</Label>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Width: {signatureWidth[0]}px</Label>
+                            <Slider
+                              value={signatureWidth}
+                              onValueChange={setSignatureWidth}
+                              min={50}
+                              max={300}
+                              step={5}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Height: {signatureHeight[0]}px</Label>
+                            <Slider
+                              value={signatureHeight}
+                              onValueChange={setSignatureHeight}
+                              min={30}
+                              max={150}
+                              step={5}
+                            />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Signature Tools Sidebar - Shown on desktop or when toggled on mobile */}
-            <div className={`lg:col-span-4 space-y-6 ${isMobileView ? (showMobileTools ? 'fixed inset-0 z-40 bg-white/95 p-4 overflow-auto' : 'hidden') : ''}`}>
-              {isMobileView && showMobileTools && (
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold">Signature Tools</h3>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setShowMobileTools(false)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <AlertCircle className="h-5 w-5" />
-                  </Button>
-                </div>
-              )}
-              
+            {/* Signature Tools Sidebar - Shown on desktop */}
+            <div className="lg:col-span-4 space-y-6 hidden lg:block">
               <Card className="shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -656,7 +876,7 @@ const SignPdfPage = () => {
                         className="h-8"
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
-                        Clear All
+                        <span className="hidden sm:inline">Clear All</span>
                       </Button>
                     </div>
                   </div>
@@ -683,24 +903,45 @@ const SignPdfPage = () => {
                           {/* Signature Position Indicators */}
                           {signaturePositions
                             .filter(pos => pos.pageNumber === currentPage)
-                            .map((position) => (
-                              <div
-                                key={position.id}
-                                className="absolute border-2 border-blue-500 bg-blue-100 bg-opacity-30 flex items-center justify-center cursor-pointer hover:bg-opacity-50 transition-all"
-                                style={{
-                                  left: `${(position.x / 595) * 100}%`,
-                                  top: `${(position.y / 842) * 100}%`,
-                                  width: `${(position.width / 595) * 100}%`,
-                                  height: `${(position.height / 842) * 100}%`,
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeSignature(position.id);
-                                }}
-                              >
-                                <Signature className="h-4 w-4 text-blue-600" />
-                              </div>
-                            ))}
+                            .map((position) => {
+                              return (
+                                <div
+                                  key={position.id}
+                                  className="absolute border-2 border-blue-500 bg-blue-100 bg-opacity-30 flex items-center justify-center cursor-pointer hover:bg-opacity-50 transition-all"
+                                  style={{
+                                    left: `${(position.x / 595) * 100}%`,
+                                    top: `${(position.y / 842) * 100}%`,
+                                    width: `${(position.width / 595) * 100}%`,
+                                    height: `${(position.height / 842) * 100}%`,
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeSignature(position.id);
+                                  }}
+                                >
+                                  {position.type === 'text' && position.text ? (
+                                    <span 
+                                      style={{ 
+                                        fontFamily: position.fontFamily, 
+                                        fontSize: `${position.fontSize}px`,
+                                        color: position.color,
+                                        opacity: 0.7
+                                      }}
+                                    >
+                                      {position.text}
+                                    </span>
+                                  ) : position.type === 'image' && position.data ? (
+                                    <img 
+                                      src={position.data} 
+                                      alt="Signature" 
+                                      className="w-full h-full object-contain opacity-70"
+                                    />
+                                  ) : (
+                                    <Signature className="h-4 w-4 text-blue-600" />
+                                  )}
+                                </div>
+                              );
+                            })}
                         </div>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -714,26 +955,25 @@ const SignPdfPage = () => {
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="h-9">
                         <Eye className="h-4 w-4 mr-1" />
-                        Preview
+                        <span className="hidden sm:inline">Preview</span>
                       </Button>
                     </div>
                     <Button 
                       onClick={savePdf}
-                      disabled={processing || signaturePositions.length === 0 || 
-                        (signatureType === 'draw' && signaturePadRef.current?.isEmpty()) ||
-                        (signatureType === 'text' && !textSignature.trim()) ||
-                        (signatureType === 'image' && !signatureImage)}
+                      disabled={processing || signaturePositions.length === 0}
                       className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 h-9"
                     >
                       {processing ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Signing...
+                          <span className="hidden sm:inline">Signing...</span>
+                          <span className="sm:hidden">Signing</span>
                         </>
                       ) : (
                         <>
                           <Save className="h-4 w-4 mr-2" />
-                          Sign PDF
+                          <span className="hidden sm:inline">Sign PDF</span>
+                          <span className="sm:hidden">Sign</span>
                         </>
                       )}
                     </Button>

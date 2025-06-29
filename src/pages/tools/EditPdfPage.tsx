@@ -1,13 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Pencil, AlertCircle, Loader2, Save, Download, Eraser, Undo, Redo, Eye, Trash2, CheckCircle } from "lucide-react";
+import { Pencil, AlertCircle, Loader2, Save, Download, Eraser, Undo, Redo, Eye, Trash2, CheckCircle, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePdfEditor } from "@/hooks/usePdfEditor";
 import { PdfUpload } from "@/components/pdf/PdfUpload";
 import { EditToolsSidebar } from "@/components/pdf/EditToolsSidebar";
 import { PdfEditor } from "@/components/pdf/PdfEditor";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from "sonner";
 
 const EditPdfPage = () => {
@@ -22,6 +23,7 @@ const EditPdfPage = () => {
   const [dragOver, setDragOver] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
   const [showMobileTools, setShowMobileTools] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const {
     file,
@@ -94,7 +96,7 @@ const EditPdfPage = () => {
     
     // Close mobile tools panel after adding an edit on mobile
     if (isMobileView) {
-      setShowMobileTools(false);
+      setSheetOpen(false);
     }
   };
 
@@ -129,32 +131,54 @@ const EditPdfPage = () => {
           {/* Mobile Tools Toggle Button */}
           {isMobileView && (
             <div className="fixed bottom-4 right-4 z-50">
-              <Button 
-                onClick={() => setShowMobileTools(!showMobileTools)} 
-                className="rounded-full w-14 h-14 shadow-lg bg-violet-600 hover:bg-violet-700"
-              >
-                <Pencil className="h-6 w-6" />
-              </Button>
+              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button 
+                    className="rounded-full w-14 h-14 shadow-lg bg-violet-600 hover:bg-violet-700"
+                  >
+                    <Pencil className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="h-[80vh] rounded-t-xl">
+                  <SheetHeader className="mb-4">
+                    <SheetTitle className="flex items-center gap-2">
+                      <Pencil className="h-5 w-5 text-violet-600" />
+                      Editing Tools
+                    </SheetTitle>
+                  </SheetHeader>
+                  <div className="overflow-y-auto pr-1 pb-16">
+                    <EditToolsSidebar
+                      file={file}
+                      fileInfo={fileInfo}
+                      currentPage={currentPage}
+                      editTool={editTool}
+                      textInput={textInput}
+                      textColor={textColor}
+                      fontSize={fontSize}
+                      fontFamily={fontFamily}
+                      strokeWidth={strokeWidth}
+                      fillColor={fillColor}
+                      opacity={opacity}
+                      onEditToolChange={setEditTool}
+                      onTextInputChange={setTextInput}
+                      onTextColorChange={setTextColor}
+                      onFontSizeChange={setFontSize}
+                      onFontFamilyChange={setFontFamily}
+                      onStrokeWidthChange={setStrokeWidth}
+                      onFillColorChange={setFillColor}
+                      onOpacityChange={setOpacity}
+                      onPageChange={changePage}
+                      onImageUpload={handleImageUpload}
+                    />
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Tools Sidebar - Shown on desktop or when toggled on mobile */}
-            <div className={`lg:col-span-1 space-y-6 ${isMobileView ? (showMobileTools ? 'fixed inset-0 z-40 bg-white/95 p-4 overflow-auto' : 'hidden') : ''}`}>
-              {isMobileView && showMobileTools && (
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold">Editing Tools</h3>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setShowMobileTools(false)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <AlertCircle className="h-5 w-5" />
-                  </Button>
-                </div>
-              )}
-              
+            {/* Tools Sidebar - Shown on desktop */}
+            <div className="lg:col-span-1 space-y-6 hidden lg:block">
               <EditToolsSidebar
                 file={file}
                 fileInfo={fileInfo}
@@ -192,11 +216,11 @@ const EditPdfPage = () => {
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={clearEdits} className="h-8">
                         <Eraser className="h-4 w-4 mr-1" />
-                        Clear
+                        <span className="hidden sm:inline">Clear</span>
                       </Button>
                       <Button variant="outline" size="sm" className="h-8">
                         <Undo className="h-4 w-4 mr-1" />
-                        Undo
+                        <span className="hidden sm:inline">Undo</span>
                       </Button>
                     </div>
                   </div>
@@ -314,7 +338,7 @@ const EditPdfPage = () => {
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="h-9">
                         <Eye className="h-4 w-4 mr-1" />
-                        Preview
+                        <span className="hidden sm:inline">Preview</span>
                       </Button>
                       <Button 
                         variant="outline" 
@@ -322,7 +346,7 @@ const EditPdfPage = () => {
                         className="text-red-600 hover:text-red-700 hover:bg-red-50 h-9"
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
-                        Discard Changes
+                        <span className="hidden sm:inline">Discard</span>
                       </Button>
                     </div>
                     <Button 
@@ -333,12 +357,14 @@ const EditPdfPage = () => {
                       {processing ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Saving...
+                          <span className="hidden sm:inline">Saving...</span>
+                          <span className="sm:hidden">Saving</span>
                         </>
                       ) : (
                         <>
                           <Save className="h-4 w-4 mr-2" />
-                          Save Changes
+                          <span className="hidden sm:inline">Save Changes</span>
+                          <span className="sm:hidden">Save</span>
                         </>
                       )}
                     </Button>
