@@ -75,15 +75,17 @@ const AuthModal = ({ open, onOpenChange, mode, onModeChange, onSuccess }: AuthMo
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogTitle>
-          {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
-        </DialogTitle>
-        <DialogDescription>
-          {mode === 'signin' 
-            ? 'Sign in to access your PDF tools and documents' 
-            : 'Get started with QuickDocs and access all our productivity tools'
-          }
-        </DialogDescription>
+        <DialogHeader>
+          <DialogTitle>
+            {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === 'signin' 
+              ? 'Sign in to access your PDF tools and documents' 
+              : 'Get started with QuickDocs and access all our productivity tools'
+            }
+          </DialogDescription>
+        </DialogHeader>
 
         {mode === 'signin' && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">

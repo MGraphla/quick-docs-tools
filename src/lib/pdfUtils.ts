@@ -5,8 +5,11 @@ import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
 
-// Set up PDF.js worker using Vite-compatible approach
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js';
+// Import the worker as a URL using Vite's import.meta.url
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.js?url';
+
+// Set up PDF.js worker using the imported worker URL
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 export interface PdfInfo {
   pageCount: number;
@@ -789,9 +792,8 @@ export function createPdfProcessor() {
         let font: PDFFont;
         try {
           switch (fontFamily) {
-            case 'Dancing Script':
-            case 'Pacifico':
-            case 'Satisfy':
+            case 'Georgia':
+            case 'Verdana':
               // Fallback to Helvetica for custom fonts in browser
               font = await pdf.embedFont(StandardFonts.Helvetica);
               break;
