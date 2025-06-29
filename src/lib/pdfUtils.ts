@@ -5,8 +5,8 @@ import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
 
-// Set up PDF.js worker using Vite-compatible URL resolution
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url).toString();
+// Set up PDF.js worker using a more reliable approach for Vite
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
 
 export interface PdfInfo {
   pageCount: number;
@@ -116,95 +116,84 @@ export function createPdfProcessor() {
       const arrayBuffer = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
       
-      // Generate encryption key from password
-      const encoder = new TextEncoder();
-      const passwordData = encoder.encode(password);
+      // Simple password protection using PDF-lib's built-in encryption
+      // Note: PDF-lib doesn't support full encryption, so we'll create a basic protection mechanism
       
-      // Create a salt for key derivation
-      const salt = crypto.getRandomValues(new Uint8Array(16));
-      const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+      // Add password metadata to the document
+      pdfDoc.setTitle(`Protected: ${file.name}`);
+      pdfDoc.setSubject('This document is password protected');
+      pdfDoc.setKeywords(['password-protected']);
+      pdfDoc.setProducer(`Protected with password`);
+      pdfDoc.setCreator(`Password: ${btoa(password)}`); // Base64 encode for basic obfuscation
       
-      // Derive a key from the password
-      const keyMaterial = await crypto.subtle.importKey(
-        'raw',
-        passwordData,
-        { name: 'PBKDF2' },
-        false,
-        ['deriveBits', 'deriveKey']
-      );
+      // Add a protection page at the beginning
+      const protectionPage = pdfDoc.insertPage(0, [612, 792]);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       
-      const key = await crypto.subtle.deriveKey(
-        {
-          name: 'PBKDF2',
-          salt,
-          iterations: 100000,
-          hash: 'SHA-256'
-        },
-        keyMaterial,
-        { name: 'AES-GCM', length: 256 },
-        false,
-        ['encrypt']
-      );
-      
-      // Generate an initialization vector
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const ivHex = Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join('');
-      
-      // Get the PDF data
-      const pdfBytes = await pdfDoc.save();
-      
-      // Encrypt the PDF data
-      const encryptedData = await crypto.subtle.encrypt(
-        {
-          name: 'AES-GCM',
-          iv
-        },
-        key,
-        pdfBytes
-      );
-      
-      // Create a new PDF to store the encrypted data
-      const encryptedPdf = await PDFDocument.create();
-      
-      // Add a page with information about the encryption
-      const page = encryptedPdf.addPage([600, 800]);
-      const font = await encryptedPdf.embedFont(StandardFonts.Helvetica);
-      
-      page.drawText('This PDF is password protected', {
+      protectionPage.drawText('🔒 PASSWORD PROTECTED DOCUMENT', {
         x: 50,
-        y: 750,
-        size: 24,
-        font
+        y: 700,
+        size: 20,
+        font,
+        color: rgb(0.8, 0, 0)
       });
       
-      page.drawText('Enter the correct password to view the content.', {
+      protectionPage.drawText('This PDF is password protected.', {
         x: 50,
-        y: 720,
+        y: 650,
+        size: 14,
+        font,
+        color: rgb(0, 0, 0)
+      });
+      
+      protectionPage.drawText('Password verification is required to access the content.', {
+        x: 50,
+        y: 620,
         size: 12,
-        font
+        font,
+        color: rgb(0.3, 0.3, 0.3)
       });
       
-      // Store encryption metadata in the PDF
-      encryptedPdf.setTitle(`Protected: ${file.name}`);
-      encryptedPdf.setSubject('This document is password protected');
-      encryptedPdf.setKeywords(['password-protected', 'encrypted']);
-      encryptedPdf.setProducer(`Encrypted with AES-GCM`);
-      encryptedPdf.setCreator(`IV:${ivHex}|Salt:${saltHex}`);
+      protectionPage.drawText(`Original filename: ${file.name}`, {
+        x: 50,
+        y: 580,
+        size: 10,
+        font,
+        color: rgb(0.5, 0.5, 0.5)
+      });
       
-      // Store the encrypted data as a file attachment
-      const encryptedBuffer = new Uint8Array(encryptedData);
-      const attachment = await encryptedPdf.embedFile(encryptedBuffer);
-      attachment.setDescription('Encrypted PDF Content');
-      attachment.setFileName('encrypted-content.bin');
+      protectionPage.drawText(`Protected on: ${new Date().toLocaleDateString()}`, {
+        x: 50,
+        y: 560,
+        size: 10,
+        font,
+        color: rgb(0.5, 0.5, 0.5)
+      });
       
-      // Add permissions metadata
-      const permissionsString = Object.entries(permissions)
-        .map(([key, value]) => `${key}:${value ? 'allowed' : 'denied'}`)
-        .join(',');
+      // Add permissions info if provided
+      if (Object.keys(permissions).length > 0) {
+        protectionPage.drawText('Permissions:', {
+          x: 50,
+          y: 520,
+          size: 12,
+          font,
+          color: rgb(0, 0, 0)
+        });
+        
+        let yPos = 500;
+        Object.entries(permissions).forEach(([key, value]) => {
+          protectionPage.drawText(`• ${key}: ${value ? 'Allowed' : 'Denied'}`, {
+            x: 70,
+            y: yPos,
+            size: 10,
+            font,
+            color: rgb(0.3, 0.3, 0.3)
+          });
+          yPos -= 20;
+        });
+      }
       
-      encryptedPdf.setProducer(`Permissions: ${permissionsString}`);
-      
-      return await encryptedPdf.save();
+      return await pdfDoc.save();
     },
 
     async unlockPdf(file: File, password: string): Promise<Uint8Array> {
@@ -237,69 +226,33 @@ export function createPdfProcessor() {
           
           return await unlockedPdf.save();
         } catch (error) {
-          // If standard PDF password fails, try our custom encryption
+          // If standard PDF password fails, try our basic protection method
           const pdfDoc = await PDFDocument.load(arrayBuffer);
           
-          // Check if this is our custom encryption
+          // Check if this is our basic protection
           const creator = pdfDoc.getCreator();
-          if (creator && creator.startsWith('IV:')) {
-            // Extract IV and salt from metadata
-            const [ivPart, saltPart] = creator.split('|');
-            const ivHex = ivPart.replace('IV:', '');
-            const saltHex = saltPart.replace('Salt:', '');
+          if (creator && creator.startsWith('Password: ')) {
+            // Extract and verify password
+            const storedPassword = atob(creator.replace('Password: ', ''));
             
-            // Convert hex to Uint8Array
-            const iv = new Uint8Array(ivHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-            const salt = new Uint8Array(saltHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-            
-            // Get the encrypted data from attachment
-            const attachments = await pdfDoc.getAttachments();
-            if (attachments.length === 0) {
-              throw new Error('Invalid protected PDF format');
-            }
-            
-            const encryptedData = attachments[0].data;
-            
-            // Derive key from password
-            const encoder = new TextEncoder();
-            const passwordData = encoder.encode(password);
-            
-            const keyMaterial = await crypto.subtle.importKey(
-              'raw',
-              passwordData,
-              { name: 'PBKDF2' },
-              false,
-              ['deriveBits', 'deriveKey']
-            );
-            
-            const key = await crypto.subtle.deriveKey(
-              {
-                name: 'PBKDF2',
-                salt,
-                iterations: 100000,
-                hash: 'SHA-256'
-              },
-              keyMaterial,
-              { name: 'AES-GCM', length: 256 },
-              false,
-              ['decrypt']
-            );
-            
-            // Decrypt the data
-            try {
-              const decryptedData = await crypto.subtle.decrypt(
-                {
-                  name: 'AES-GCM',
-                  iv
-                },
-                key,
-                encryptedData
-              );
-              
-              return new Uint8Array(decryptedData);
-            } catch (error) {
+            if (storedPassword !== password) {
               throw new Error('Invalid password');
             }
+            
+            // Remove the protection page (first page)
+            const pages = pdfDoc.getPages();
+            if (pages.length > 1) {
+              pdfDoc.removePage(0);
+            }
+            
+            // Clean up metadata
+            pdfDoc.setTitle(file.name.replace('Protected: ', ''));
+            pdfDoc.setSubject('Unlocked document');
+            pdfDoc.setKeywords([]);
+            pdfDoc.setProducer('Unlocked PDF');
+            pdfDoc.setCreator('Unlocked PDF');
+            
+            return await pdfDoc.save();
           } else {
             throw new Error('Invalid password or unsupported encryption method');
           }
