@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from "react";
-import { Upload, FileText, Download, Loader2, CheckCircle, AlertCircle, Settings, Zap, X, Save, ListOrdered, ListChecks } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Upload, FileText, Download, Loader2, CheckCircle, AlertCircle, Settings, Zap, X, Save, ListOrdered, ListChecks, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,11 +12,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize, parsePageRanges } from "@/lib/pdfUtils";
+import { suggestSplitFileNames } from "@/lib/aiUtils";
 
 interface SplitFile {
   name: string;
   url: string;
   size: string;
+  suggestedName?: string;
 }
 
 const SplitPdfPage = () => {
@@ -30,6 +32,10 @@ const SplitPdfPage = () => {
   const [progressMessage, setProgressMessage] = useState("");
   const [splitFiles, setSplitFiles] = useState<SplitFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [useAiNames, setUseAiNames] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [customFileNames, setCustomFileNames] = useState<{[key: number]: string}>({});
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfProcessor = createPdfProcessor();
 
@@ -91,6 +97,13 @@ const SplitPdfPage = () => {
     });
   };
 
+  const updateCustomFileName = (index: number, name: string) => {
+    setCustomFileNames(prev => ({
+      ...prev,
+      [index]: name
+    }));
+  };
+
   const splitPdf = async () => {
     if (!file) {
       toast.error("Please select a PDF file");
@@ -137,13 +150,39 @@ const SplitPdfPage = () => {
         }
       }
 
+      if (ranges.length === 0) {
+        throw new Error("No valid page ranges specified");
+      }
+
+      // Get AI-suggested file names if enabled
+      let suggestedNames: string[] = [];
+      if (useAiNames) {
+        setIsAnalyzing(true);
+        setProgressMessage("Analyzing content for intelligent naming...");
+        try {
+          suggestedNames = await suggestSplitFileNames(file.name, fileInfo.pages, ranges);
+        } catch (error) {
+          console.error('Error getting AI file names:', error);
+          suggestedNames = ranges.map((_, index) => `split-${index + 1}-${file.name}`);
+        }
+        setIsAnalyzing(false);
+      } else {
+        suggestedNames = ranges.map((_, index) => `split-${index + 1}-${file.name}`);
+      }
+
       const results = await pdfProcessor.splitPdf(file, ranges);
       
-      const splitFiles = results.map((data, index) => ({
-        name: `split-${index + 1}-${file.name}`,
-        url: pdfProcessor.createDownloadLink(data, `split-${index + 1}-${file.name}`),
-        size: formatFileSize(data.length)
-      }));
+      const splitFiles = results.map((data, index) => {
+        // Use custom filename if provided, otherwise use AI suggestion
+        const fileName = customFileNames[index] || suggestedNames[index] || `split-${index + 1}-${file.name}`;
+        
+        return {
+          name: fileName,
+          url: pdfProcessor.createDownloadLink(data, fileName),
+          size: formatFileSize(data.length),
+          suggestedName: suggestedNames[index]
+        };
+      });
       
       setSplitFiles(splitFiles);
       setProgress(100);
@@ -166,6 +205,13 @@ const SplitPdfPage = () => {
     link.download = splitFile.name;
     link.click();
     toast.success(`Downloaded ${splitFile.name}`);
+  };
+
+  const downloadAllFiles = () => {
+    splitFiles.forEach((file, index) => {
+      setTimeout(() => downloadSplitFile(file), index * 500);
+    });
+    toast.success(`Downloading ${splitFiles.length} files...`);
   };
 
   return (
@@ -319,15 +365,34 @@ const SplitPdfPage = () => {
                   </TabsContent>
                 </Tabs>
 
+                <div className="mt-4 space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="use-ai-names"
+                      checked={useAiNames}
+                      onCheckedChange={(checked) => setUseAiNames(checked as boolean)}
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="use-ai-names" className="flex items-center gap-1">
+                        <Sparkles className="h-4 w-4 text-orange-500" />
+                        Use AI to name split files
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        AI will analyze content and suggest meaningful names for each file
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <Button
                   onClick={splitPdf}
-                  disabled={processing}
-                  className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800"
+                  disabled={processing || isAnalyzing}
+                  className="w-full mt-4 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800"
                 >
-                  {processing ? (
+                  {processing || isAnalyzing ? (
                     <>
                       <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      Splitting...
+                      {isAnalyzing ? "Analyzing..." : "Splitting..."}
                     </>
                   ) : (
                     <>
@@ -370,28 +435,98 @@ const SplitPdfPage = () => {
             {splitFiles.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Split Results</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Split Results</CardTitle>
+                    {splitFiles.length > 1 && (
+                      <Button 
+                        onClick={downloadAllFiles}
+                        className="bg-orange-600 hover:bg-orange-700"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download All
+                      </Button>
+                    )}
+                  </div>
                   <CardDescription>
-                    Download your split PDF files
+                    Download your split PDF files with intelligent naming
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="space-y-4">
                     {splitFiles.map((splitFile, index) => (
-                      <div key={index} className="border rounded-lg p-4 bg-gray-50">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-gray-900 truncate">{splitFile.name}</h4>
-                          <Badge variant="secondary">{splitFile.size}</Badge>
-                        </div>
-                        <Button
-                          onClick={() => downloadSplitFile(splitFile)}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
-                        </Button>
-                      </div>
+                      <Card key={index} className="border border-gray-200">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center justify-center w-10 h-10 bg-orange-100 rounded-lg">
+                              <FileText className="h-5 w-5 text-orange-600" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="space-y-2">
+                                <Input
+                                  value={customFileNames[index] || splitFile.name}
+                                  onChange={(e) => updateCustomFileName(index, e.target.value)}
+                                  className="font-medium text-gray-900"
+                                />
+                                {splitFile.suggestedName && splitFile.suggestedName !== splitFile.name && (
+                                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                                    <Sparkles className="h-3 w-3 text-orange-500" />
+                                    <span>AI suggested: {splitFile.suggestedName}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                {splitFile.size}
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => downloadSplitFile(splitFile)}
+                              className="bg-orange-600 hover:bg-orange-700"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Download
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* AI Naming Information */}
+            {!splitFiles.length && (
+              <Card className="border-orange-200 bg-orange-50/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-orange-600" />
+                    Intelligent File Naming
+                  </CardTitle>
+                  <CardDescription>
+                    Our AI can analyze your PDF content to generate meaningful names for split files
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-6 bg-white rounded-lg border border-orange-200">
+                    <h3 className="text-lg font-medium text-orange-800 mb-4">Named Split Files</h3>
+                    <p className="text-gray-700 mb-4">
+                      When a PDF is split into multiple files, our AI can generate relevant names for each file based on content:
+                    </p>
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center gap-2">
+                        <X className="h-4 w-4 text-red-500" />
+                        <p className="text-gray-600">Instead of generic names like "part1.pdf", "part2.pdf"...</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <p className="text-gray-600">Get meaningful names like "Chapter 1 - Introduction.pdf", "Financial Statements.pdf"</p>
+                      </div>
+                    </div>
+                    <div className="bg-orange-100 p-4 rounded-lg">
+                      <p className="text-sm text-orange-800">
+                        <strong>How it works:</strong> Our AI analyzes the content of each section to determine what it contains, then generates appropriate file names based on that analysis.
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

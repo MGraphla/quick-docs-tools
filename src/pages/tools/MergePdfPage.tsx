@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from "react";
-import { Upload, FileText, Download, X, ArrowUp, ArrowDown, Eye, Loader2, CheckCircle, AlertCircle, Shuffle } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Upload, FileText, Download, X, ArrowUp, ArrowDown, Eye, Loader2, CheckCircle, AlertCircle, Shuffle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -7,12 +7,22 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { analyzePdfContent } from "@/lib/aiUtils";
 
 interface PdfFile {
   id: string;
   file: File;
   info?: PdfInfo;
   size: string;
+}
+
+interface AiAnalysis {
+  suggestedFilename: string;
+  summary: string;
+  duplicatePages: string;
+  isLoading: boolean;
 }
 
 const MergePdfPage = () => {
@@ -23,6 +33,14 @@ const MergePdfPage = () => {
   const [mergedFileName, setMergedFileName] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [progressMessage, setProgressMessage] = useState("");
+  const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis>({
+    suggestedFilename: "",
+    summary: "",
+    duplicatePages: "",
+    isLoading: false
+  });
+  const [customFileName, setCustomFileName] = useState("");
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfProcessor = createPdfProcessor();
 
@@ -122,6 +140,43 @@ const MergePdfPage = () => {
     toast.success("Files shuffled");
   };
 
+  const analyzeWithAI = async () => {
+    if (files.length < 2) {
+      toast.error("Please select at least 2 PDF files to analyze");
+      return;
+    }
+    
+    setAiAnalysis(prev => ({ ...prev, isLoading: true }));
+    
+    try {
+      // Extract file names for context
+      const fileNames = files.map(f => f.file.name);
+      const totalPages = files.reduce((sum, file) => sum + (file.info?.pageCount || 0), 0);
+      
+      // Call the AI analysis function
+      const analysis = await analyzePdfContent(fileNames, totalPages);
+      
+      setAiAnalysis({
+        ...analysis,
+        isLoading: false
+      });
+      
+      // Set the suggested filename as the custom filename
+      setCustomFileName(analysis.suggestedFilename);
+      
+      toast.success("AI analysis completed successfully");
+    } catch (error) {
+      console.error('AI analysis error:', error);
+      toast.error("Failed to analyze PDFs with AI. Using default options.");
+      setAiAnalysis({
+        suggestedFilename: "merged-document.pdf",
+        summary: "Unable to generate summary.",
+        duplicatePages: "Unable to detect duplicates.",
+        isLoading: false
+      });
+    }
+  };
+
   const mergePdfs = async () => {
     if (files.length < 2) {
       toast.error("Please select at least 2 PDF files to merge");
@@ -160,7 +215,9 @@ const MergePdfPage = () => {
       // Create download URL
       const url = pdfProcessor.createDownloadLink(mergedPdfBytes, 'merged-document.pdf');
       const totalPages = files.reduce((sum, file) => sum + (file.info?.pageCount || 0), 0);
-      const fileName = `merged-document-${files.length}-files-${totalPages}-pages.pdf`;
+      
+      // Use custom filename if provided, otherwise use AI suggestion or default
+      const fileName = customFileName || aiAnalysis.suggestedFilename || `merged-document-${files.length}-files-${totalPages}-pages.pdf`;
       
       setMergedFileUrl(url);
       setMergedFileName(fileName);
@@ -195,6 +252,13 @@ const MergePdfPage = () => {
     setFiles([]);
     setMergedFileUrl(null);
     setMergedFileName(null);
+    setAiAnalysis({
+      suggestedFilename: "",
+      summary: "",
+      duplicatePages: "",
+      isLoading: false
+    });
+    setCustomFileName("");
     toast.success("All files cleared");
   };
 
@@ -345,6 +409,95 @@ const MergePdfPage = () => {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* AI Analysis */}
+      {files.length >= 2 && (
+        <Card className="border-purple-200 bg-purple-50/30">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-purple-600" />
+                AI-Powered Document Analysis
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={analyzeWithAI}
+                disabled={aiAnalysis.isLoading}
+                className="bg-purple-100 border-purple-200 text-purple-700 hover:bg-purple-200"
+              >
+                {aiAnalysis.isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Analyze with AI
+                  </>
+                )}
+              </Button>
+            </div>
+            <CardDescription>
+              Let AI analyze your PDFs to suggest a filename, summarize content, and detect duplicates
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {aiAnalysis.isLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 text-purple-600 animate-spin" />
+              </div>
+            ) : (
+              <>
+                {(aiAnalysis.suggestedFilename || aiAnalysis.summary || aiAnalysis.duplicatePages) ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-purple-800">Suggested Filename</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          value={customFileName || aiAnalysis.suggestedFilename} 
+                          onChange={(e) => setCustomFileName(e.target.value)}
+                          className="border-purple-200 bg-white"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-purple-800">Document Summary</Label>
+                      <div className="p-3 bg-white rounded-md border border-purple-200">
+                        <p className="text-gray-700">{aiAnalysis.summary}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-purple-800">Potential Duplicate Pages</Label>
+                      <div className="p-3 bg-white rounded-md border border-purple-200">
+                        <p className="text-gray-700">{aiAnalysis.duplicatePages}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center p-6 bg-white rounded-lg border border-purple-200">
+                    <Sparkles className="h-12 w-12 text-purple-400 mx-auto mb-3" />
+                    <h3 className="text-lg font-medium text-purple-800 mb-2">Enhance Your PDF Merge</h3>
+                    <p className="text-gray-600 mb-4">
+                      Click "Analyze with AI" to get intelligent suggestions for your merged document.
+                    </p>
+                    <Button 
+                      onClick={analyzeWithAI}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Analyze with AI
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       )}

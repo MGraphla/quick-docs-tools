@@ -19,4 +19,8 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  define: {
+    'import.meta.env.VITE_OPENROUTER_API_KEY': JSON.stringify(process.env.OPENROUTER_API_KEY),
+    'import.meta.env.VITE_OPENROUTER_MODEL': JSON.stringify(process.env.OPENROUTER_MODEL),
+  },
 }));
