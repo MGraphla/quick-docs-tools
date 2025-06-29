@@ -5,8 +5,8 @@ import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
 
-// Set up PDF.js worker using a more reliable approach for Vite
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+// Set up PDF.js worker using Vite-compatible approach
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url).toString();
 
 export interface PdfInfo {
   pageCount: number;

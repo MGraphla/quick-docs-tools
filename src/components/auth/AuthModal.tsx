@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -75,12 +74,12 @@ const AuthModal = ({ open, onOpenChange, mode, onModeChange, onSuccess }: AuthMo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" aria-describedby="auth-modal-description">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle id="auth-modal-title">
             {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="auth-modal-description">
             {mode === 'signin' 
               ? 'Sign in to access your PDF tools and documents' 
               : 'Get started with QuickDocs and access all our productivity tools'
