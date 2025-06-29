@@ -12,7 +12,7 @@ import 'react-quill/dist/quill.snow.css';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import pdfMake from 'pdfmake/build/pdfmake';
-import * as pdfFonts from 'pdfmake/build/vfs_fonts';
+import pdfFonts from 'pdfmake/build/vfs_fonts';
 import htmlToPdfmake from 'html-to-pdfmake';
 
 // Initialize pdfMake with fonts
