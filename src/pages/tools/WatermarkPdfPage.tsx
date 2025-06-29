@@ -216,6 +216,11 @@ const WatermarkPdfPage = () => {
       setProgressMessage("Watermark applied successfully!");
       toast.success("Watermark applied successfully!");
       
+      // Close mobile sheet if open
+      if (isMobileView && sheetOpen) {
+        setSheetOpen(false);
+      }
+      
     } catch (error) {
       console.error('Watermark error:', error);
       toast.error(error instanceof Error ? error.message : "Failed to apply watermark. Please try again.");
@@ -532,6 +537,24 @@ const WatermarkPdfPage = () => {
                               step={5}
                             />
                           </div>
+                          
+                          <Button
+                            onClick={applyWatermark}
+                            disabled={processing || (watermarkType === 'text' && !textWatermark.trim()) || (watermarkType === 'image' && !imageWatermark)}
+                            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 text-lg font-semibold shadow-sm mt-4"
+                          >
+                            {processing ? (
+                              <>
+                                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                                Applying Watermark...
+                              </>
+                            ) : (
+                              <>
+                                <Droplets className="h-5 w-5 mr-2" />
+                                Apply Watermark
+                              </>
+                            )}
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -945,6 +968,35 @@ const WatermarkPdfPage = () => {
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Download
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {/* Mobile Success Card */}
+              {watermarkedFile && isMobileView && (
+                <Card className="border-green-200 bg-green-50 shadow-sm">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col items-center gap-4 text-center">
+                      <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full">
+                        <CheckCircle className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-green-800 mb-1">
+                          Watermark Applied!
+                        </h3>
+                        <p className="text-green-700 mb-2">{watermarkedFile.name}</p>
+                        <p className="text-sm text-green-600">
+                          Watermark has been applied to all pages
+                        </p>
+                      </div>
+                      <Button
+                        onClick={downloadWatermarked}
+                        className="bg-green-600 hover:bg-green-700 text-white w-full"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Watermarked PDF
                       </Button>
                     </div>
                   </CardContent>
