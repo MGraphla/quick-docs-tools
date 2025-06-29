@@ -27,6 +27,12 @@ import PdfToJpgPage from "./pages/tools/PdfToJpgPage";
 import PdfToPowerpointPage from "./pages/tools/PdfToPowerpointPage";
 import PdfToExcelPage from "./pages/tools/PdfToExcelPage";
 import WordToPdfPage from "./pages/tools/WordToPdfPage";
+import TextEditorPage from "./pages/tools/TextEditorPage";
+import ResumeBuilderPage from "./pages/tools/ResumeBuilderPage";
+import RedactPdfPage from "./pages/tools/RedactPdfPage";
+import AudioTrimmerPage from "./pages/tools/AudioTrimmerPage";
+import CalendarGeneratorPage from "./pages/tools/CalendarGeneratorPage";
+import InvoiceGeneratorPage from "./pages/tools/InvoiceGeneratorPage";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +66,12 @@ const App = () => (
           <Route path="/dashboard/pdf-to-powerpoint" element={<Dashboard><PdfToPowerpointPage /></Dashboard>} />
           <Route path="/dashboard/pdf-to-excel" element={<Dashboard><PdfToExcelPage /></Dashboard>} />
           <Route path="/dashboard/word-to-pdf" element={<Dashboard><WordToPdfPage /></Dashboard>} />
+          <Route path="/dashboard/text-editor" element={<Dashboard><TextEditorPage /></Dashboard>} />
+          <Route path="/dashboard/resume-builder" element={<Dashboard><ResumeBuilderPage /></Dashboard>} />
+          <Route path="/dashboard/redact-pdf" element={<Dashboard><RedactPdfPage /></Dashboard>} />
+          <Route path="/dashboard/audio-trimmer" element={<Dashboard><AudioTrimmerPage /></Dashboard>} />
+          <Route path="/dashboard/calendar-generator" element={<Dashboard><CalendarGeneratorPage /></Dashboard>} />
+          <Route path="/dashboard/invoice-generator" element={<Dashboard><InvoiceGeneratorPage /></Dashboard>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

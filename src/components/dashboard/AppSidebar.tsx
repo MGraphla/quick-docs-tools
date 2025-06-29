@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { 
   FileText, 
@@ -20,7 +19,13 @@ import {
   Minimize2,
   FileType,
   FileSpreadsheet,
-  Presentation
+  Presentation,
+  Type,
+  FileEdit,
+  Scissors as ScissorsIcon,
+  Music,
+  Calendar,
+  Receipt
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -54,6 +59,7 @@ const pdfTools = [
   { name: "Watermark", path: "/dashboard/watermark-pdf", icon: Shield },
   { name: "Rotate PDF", path: "/dashboard/rotate-pdf", icon: Settings },
   { name: "Protect PDF", path: "/dashboard/protect-pdf", icon: Shield },
+  { name: "Redact PDF", path: "/dashboard/redact-pdf", icon: FileEdit },
 ];
 
 const productivityTools = [
@@ -61,6 +67,11 @@ const productivityTools = [
   { name: "Link Shortener", path: "/dashboard/link-shortener", icon: LinkIcon },
   { name: "Audio to Text", path: "/dashboard/audio-to-text", icon: Mic },
   { name: "Live Transcription", path: "/dashboard/live-transcription", icon: Mic },
+  { name: "Text Editor", path: "/dashboard/text-editor", icon: Type },
+  { name: "Resume Builder", path: "/dashboard/resume-builder", icon: FileText },
+  { name: "Audio Trimmer", path: "/dashboard/audio-trimmer", icon: Music },
+  { name: "Calendar Generator", path: "/dashboard/calendar-generator", icon: Calendar },
+  { name: "Invoice Generator", path: "/dashboard/invoice-generator", icon: Receipt },
 ];
 
 export function AppSidebar() {
