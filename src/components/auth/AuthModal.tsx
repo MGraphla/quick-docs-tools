@@ -75,10 +75,10 @@ const AuthModal = ({ open, onOpenChange, mode, onModeChange, onSuccess }: AuthMo
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
+        <DialogTitle>
+          {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
+        </DialogTitle>
         <DialogHeader>
-          <DialogTitle>
-            {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
-          </DialogTitle>
           <DialogDescription>
             {mode === 'signin' 
               ? 'Sign in to access your PDF tools and documents' 
