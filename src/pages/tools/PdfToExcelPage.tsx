@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
+import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 
 interface ConvertedFile {
@@ -499,7 +500,7 @@ const PdfToExcelPage = () => {
             {convertedFiles.length > 0 ? (
               <Card className="border-green-200 shadow-sm">
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
                     <div>
                       <CardTitle className="flex items-center gap-2 text-lg">
                         <CheckCircle className="h-5 w-5 text-green-600" />
@@ -551,7 +552,7 @@ const PdfToExcelPage = () => {
                             className="h-9"
                           >
                             <Eye className="h-4 w-4 mr-1" />
-                            Preview
+                            <span className="hidden sm:inline">Preview</span>
                           </Button>
                           <Button
                             size="sm"
@@ -559,7 +560,7 @@ const PdfToExcelPage = () => {
                             className="bg-emerald-600 hover:bg-emerald-700 text-white h-9"
                           >
                             <Download className="h-4 w-4 mr-1" />
-                            Download
+                            <span className="hidden sm:inline">Download</span>
                           </Button>
                         </div>
                       </div>
