@@ -1,5 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { Type, Download, Bold, Italic, Underline, List, ListOrdered, Link as LinkIcon, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, AlignJustify, Heading1, Heading2, Heading3, FileText, CheckCircle, AlertCircle, Printer, SpellCheck as Spellcheck, ZoomIn, ZoomOut, Undo, Redo, Palette, Highlighter, Strikethrough, Indent, Outdent, Weight as LineHeight, Eraser, Save, ChevronDown, Code, Quote, Paperclip, MessageSquare } from "lucide-react";
+import { 
+  Type, Download, Bold, Italic, Underline, List, ListOrdered, Link as LinkIcon, 
+  Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, AlignJustify, 
+  Heading1, Heading2, Heading3, FileText, CheckCircle, AlertCircle, Printer, 
+  SpellCheck, ZoomIn, ZoomOut, Undo, Redo, Palette, Highlighter, Strikethrough, 
+  Indent, Outdent, LineHeight, Eraser, Save, ChevronDown, Code, Quote, Paperclip, 
+  MessageSquare, X, Minus, Plus, Eye
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,7 +41,7 @@ const TextEditorPage = () => {
   const [paperSize, setPaperSize] = useState('a4');
   const [orientation, setOrientation] = useState('portrait');
   const [fontSize, setFontSize] = useState('12');
-  const [fontFamily, setFontFamily] = useState('Helvetica');
+  const [fontFamily, setFontFamily] = useState('Arial');
   const [margins, setMargins] = useState('normal');
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [exportFormat, setExportFormat] = useState('pdf');
@@ -516,50 +523,54 @@ const TextEditorPage = () => {
       {/* Text Editor Toolbar */}
       <Card className="border shadow-md">
         <CardContent className="p-0">
-          <div className="border-b p-1 flex flex-wrap gap-1 items-center" id="toolbar">
+          <div className="border-b p-1 flex flex-wrap gap-1 items-center bg-gray-50" id="toolbar">
             {/* File Operations */}
             <div className="flex items-center border-r pr-1">
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0" 
+                className="h-8 w-8 p-0 rounded-md" 
                 onClick={() => {
                   if (quillRef.current) {
                     const quill = quillRef.current.getEditor();
                     quill.history.undo();
                   }
                 }}
+                title="Undo"
               >
                 <Undo className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 rounded-md"
                 onClick={() => {
                   if (quillRef.current) {
                     const quill = quillRef.current.getEditor();
                     quill.history.redo();
                   }
                 }}
+                title="Redo"
               >
                 <Redo className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 rounded-md"
                 onClick={handlePrint}
+                title="Print"
               >
                 <Printer className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 rounded-md"
                 onClick={() => toast.info("Spell check would be implemented here")}
+                title="Spell Check"
               >
-                <Spellcheck className="h-4 w-4" />
+                <SpellCheck className="h-4 w-4" />
               </Button>
             </div>
             
@@ -568,14 +579,15 @@ const TextEditorPage = () => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 rounded-md"
                 onClick={() => setZoom(Math.max(50, zoom - 10))}
+                title="Zoom Out"
               >
                 <ZoomOut className="h-4 w-4" />
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs">
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs rounded-md">
                     {zoom}%
                   </Button>
                 </DropdownMenuTrigger>
@@ -591,8 +603,9 @@ const TextEditorPage = () => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 rounded-md"
                 onClick={() => setZoom(Math.min(200, zoom + 10))}
+                title="Zoom In"
               >
                 <ZoomIn className="h-4 w-4" />
               </Button>
@@ -613,7 +626,7 @@ const TextEditorPage = () => {
                   }
                 }}
               >
-                <SelectTrigger className="h-8 w-[130px] border-none focus:ring-0 focus:ring-offset-0">
+                <SelectTrigger className="h-8 w-[130px] border-none focus:ring-0 focus:ring-offset-0 rounded-md">
                   <SelectValue placeholder="Normal Text" />
                 </SelectTrigger>
                 <SelectContent>
@@ -638,7 +651,7 @@ const TextEditorPage = () => {
                   }
                 }}
               >
-                <SelectTrigger className="h-8 w-[130px] border-none focus:ring-0 focus:ring-offset-0">
+                <SelectTrigger className="h-8 w-[130px] border-none focus:ring-0 focus:ring-offset-0 rounded-md">
                   <SelectValue placeholder="Arial" />
                 </SelectTrigger>
                 <SelectContent>
@@ -654,6 +667,22 @@ const TextEditorPage = () => {
             
             {/* Font Size */}
             <div className="flex items-center border-r pr-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 rounded-md"
+                onClick={() => {
+                  if (quillRef.current) {
+                    const quill = quillRef.current.getEditor();
+                    const currentSize = quill.getFormat().size || '13';
+                    const newSize = Math.max(8, parseInt(currentSize) - 1).toString();
+                    quill.format('size', newSize);
+                  }
+                }}
+                title="Decrease Font Size"
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
               <Select 
                 defaultValue="13"
                 onValueChange={(value) => {
@@ -663,7 +692,7 @@ const TextEditorPage = () => {
                   }
                 }}
               >
-                <SelectTrigger className="h-8 w-[70px] border-none focus:ring-0 focus:ring-offset-0">
+                <SelectTrigger className="h-8 w-[60px] border-none focus:ring-0 focus:ring-offset-0 rounded-md">
                   <SelectValue placeholder="13" />
                 </SelectTrigger>
                 <SelectContent>
@@ -682,6 +711,22 @@ const TextEditorPage = () => {
                   <SelectItem value="48">48</SelectItem>
                 </SelectContent>
               </Select>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 rounded-md"
+                onClick={() => {
+                  if (quillRef.current) {
+                    const quill = quillRef.current.getEditor();
+                    const currentSize = quill.getFormat().size || '13';
+                    const newSize = Math.min(48, parseInt(currentSize) + 1).toString();
+                    quill.format('size', newSize);
+                  }
+                }}
+                title="Increase Font Size"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
             
             {/* Text Formatting */}
@@ -689,7 +734,7 @@ const TextEditorPage = () => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-bold"
+                className="h-8 w-8 p-0 rounded-md ql-bold"
                 onClick={() => {
                   if (quillRef.current) {
                     const quill = quillRef.current.getEditor();
@@ -697,13 +742,14 @@ const TextEditorPage = () => {
                     quill.format('bold', !isBold);
                   }
                 }}
+                title="Bold"
               >
                 <Bold className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-italic"
+                className="h-8 w-8 p-0 rounded-md ql-italic"
                 onClick={() => {
                   if (quillRef.current) {
                     const quill = quillRef.current.getEditor();
@@ -711,13 +757,14 @@ const TextEditorPage = () => {
                     quill.format('italic', !isItalic);
                   }
                 }}
+                title="Italic"
               >
                 <Italic className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-underline"
+                className="h-8 w-8 p-0 rounded-md ql-underline"
                 onClick={() => {
                   if (quillRef.current) {
                     const quill = quillRef.current.getEditor();
@@ -725,13 +772,14 @@ const TextEditorPage = () => {
                     quill.format('underline', !isUnderline);
                   }
                 }}
+                title="Underline"
               >
                 <Underline className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-strike"
+                className="h-8 w-8 p-0 rounded-md ql-strike"
                 onClick={() => {
                   if (quillRef.current) {
                     const quill = quillRef.current.getEditor();
@@ -739,6 +787,7 @@ const TextEditorPage = () => {
                     quill.format('strike', !isStrike);
                   }
                 }}
+                title="Strikethrough"
               >
                 <Strikethrough className="h-4 w-4" />
               </Button>
@@ -748,7 +797,7 @@ const TextEditorPage = () => {
             <div className="flex items-center border-r pr-1">
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 relative">
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 relative rounded-md" title="Text Color">
                     <Palette className="h-4 w-4" />
                     <div 
                       className="absolute bottom-0 left-0 right-0 h-1 rounded-sm" 
@@ -783,7 +832,7 @@ const TextEditorPage = () => {
               
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 relative">
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 relative rounded-md" title="Highlight Color">
                     <Highlighter className="h-4 w-4" />
                     <div 
                       className="absolute bottom-0 left-0 right-0 h-1 rounded-sm" 
@@ -822,7 +871,7 @@ const TextEditorPage = () => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-link"
+                className="h-8 w-8 p-0 rounded-md ql-link"
                 onClick={() => {
                   if (quillRef.current) {
                     const quill = quillRef.current.getEditor();
@@ -839,13 +888,14 @@ const TextEditorPage = () => {
                     }
                   }
                 }}
+                title="Insert Link"
               >
                 <LinkIcon className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-image"
+                className="h-8 w-8 p-0 rounded-md ql-image"
                 onClick={() => {
                   if (quillRef.current) {
                     const quill = quillRef.current.getEditor();
@@ -860,21 +910,23 @@ const TextEditorPage = () => {
                     }
                   }
                 }}
+                title="Insert Image"
               >
                 <ImageIcon className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 rounded-md"
                 onClick={handleAddComment}
+                title="Add Comment"
               >
                 <MessageSquare className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 rounded-md"
                 onClick={() => {
                   const input = document.createElement('input');
                   input.type = 'file';
@@ -887,6 +939,7 @@ const TextEditorPage = () => {
                   };
                   input.click();
                 }}
+                title="Attach File"
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
@@ -897,7 +950,7 @@ const TextEditorPage = () => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-align"
+                className="h-8 w-8 p-0 rounded-md ql-align"
                 value=""
                 onClick={() => {
                   if (quillRef.current) {
@@ -905,13 +958,14 @@ const TextEditorPage = () => {
                     quill.format('align', '');
                   }
                 }}
+                title="Align Left"
               >
                 <AlignLeft className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-align"
+                className="h-8 w-8 p-0 rounded-md ql-align"
                 value="center"
                 onClick={() => {
                   if (quillRef.current) {
@@ -919,13 +973,14 @@ const TextEditorPage = () => {
                     quill.format('align', 'center');
                   }
                 }}
+                title="Align Center"
               >
                 <AlignCenter className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-align"
+                className="h-8 w-8 p-0 rounded-md ql-align"
                 value="right"
                 onClick={() => {
                   if (quillRef.current) {
@@ -933,13 +988,14 @@ const TextEditorPage = () => {
                     quill.format('align', 'right');
                   }
                 }}
+                title="Align Right"
               >
                 <AlignRight className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-align"
+                className="h-8 w-8 p-0 rounded-md ql-align"
                 value="justify"
                 onClick={() => {
                   if (quillRef.current) {
@@ -947,6 +1003,7 @@ const TextEditorPage = () => {
                     quill.format('align', 'justify');
                   }
                 }}
+                title="Justify"
               >
                 <AlignJustify className="h-4 w-4" />
               </Button>
@@ -957,7 +1014,7 @@ const TextEditorPage = () => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-list"
+                className="h-8 w-8 p-0 rounded-md ql-list"
                 value="bullet"
                 onClick={() => {
                   if (quillRef.current) {
@@ -966,13 +1023,14 @@ const TextEditorPage = () => {
                     quill.format('list', format.list === 'bullet' ? false : 'bullet');
                   }
                 }}
+                title="Bullet List"
               >
                 <List className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-list"
+                className="h-8 w-8 p-0 rounded-md ql-list"
                 value="ordered"
                 onClick={() => {
                   if (quillRef.current) {
@@ -981,13 +1039,14 @@ const TextEditorPage = () => {
                     quill.format('list', format.list === 'ordered' ? false : 'ordered');
                   }
                 }}
+                title="Numbered List"
               >
                 <ListOrdered className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-indent"
+                className="h-8 w-8 p-0 rounded-md ql-indent"
                 value="-1"
                 onClick={() => {
                   if (quillRef.current) {
@@ -995,13 +1054,14 @@ const TextEditorPage = () => {
                     quill.format('indent', '-1');
                   }
                 }}
+                title="Decrease Indent"
               >
                 <Outdent className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-indent"
+                className="h-8 w-8 p-0 rounded-md ql-indent"
                 value="+1"
                 onClick={() => {
                   if (quillRef.current) {
@@ -1009,6 +1069,7 @@ const TextEditorPage = () => {
                     quill.format('indent', '+1');
                   }
                 }}
+                title="Increase Indent"
               >
                 <Indent className="h-4 w-4" />
               </Button>
@@ -1019,7 +1080,7 @@ const TextEditorPage = () => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-blockquote"
+                className="h-8 w-8 p-0 rounded-md ql-blockquote"
                 onClick={() => {
                   if (quillRef.current) {
                     const quill = quillRef.current.getEditor();
@@ -1027,13 +1088,14 @@ const TextEditorPage = () => {
                     quill.format('blockquote', !format.blockquote);
                   }
                 }}
+                title="Quote"
               >
                 <Quote className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0 ql-code-block"
+                className="h-8 w-8 p-0 rounded-md ql-code-block"
                 onClick={() => {
                   if (quillRef.current) {
                     const quill = quillRef.current.getEditor();
@@ -1041,13 +1103,14 @@ const TextEditorPage = () => {
                     quill.format('code-block', !format['code-block']);
                   }
                 }}
+                title="Code Block"
               >
                 <Code className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 rounded-md"
                 onClick={() => {
                   if (quillRef.current) {
                     const quill = quillRef.current.getEditor();
@@ -1056,14 +1119,16 @@ const TextEditorPage = () => {
                     toast.info("Line height adjusted");
                   }
                 }}
+                title="Line Height"
               >
                 <LineHeight className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 rounded-md"
                 onClick={handleFormatClear}
+                title="Clear Formatting"
               >
                 <Eraser className="h-4 w-4" />
               </Button>
