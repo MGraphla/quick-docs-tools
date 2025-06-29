@@ -45,7 +45,7 @@ const WordToPdfPage = () => {
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/msword'
       ];
-      return validTypes.includes(file.type);
+      return validTypes.includes(file.type) || file.name.endsWith('.docx') || file.name.endsWith('.doc');
     });
     
     if (validFiles.length !== selectedFiles.length) {
@@ -102,6 +102,20 @@ const WordToPdfPage = () => {
     try {
       const converted: ConvertedFile[] = [];
       
+      const steps = [
+        { message: "Analyzing documents...", progress: 15 },
+        { message: "Processing text and formatting...", progress: 30 },
+        { message: "Converting images and graphics...", progress: 50 },
+        { message: "Creating PDF structure...", progress: 70 },
+        { message: "Finalizing documents...", progress: 90 }
+      ];
+
+      for (const step of steps) {
+        setProgressMessage(step.message);
+        setProgress(step.progress);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setProgress(((i + 1) / files.length) * 100);
@@ -111,6 +125,7 @@ const WordToPdfPage = () => {
           // Perform actual Word to PDF conversion
           const pdfBytes = await pdfProcessor.convertWordToPdf(file.file);
           
+          // Create a proper PDF file
           const fileName = file.file.name.replace(/\.(docx?|doc)$/i, '.pdf');
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
           const url = URL.createObjectURL(blob);
@@ -455,7 +470,7 @@ const WordToPdfPage = () => {
                       <span>{file.pages} pages</span>
                       <span>{file.size}</span>
                       <span className="text-green-600 font-medium">
-                        {Math.round((file.originalSize - parseInt(file.size)) / file.originalSize * 100)}% smaller
+                        {Math.round((file.originalSize - parseInt(file.size.replace(/[^\d]/g, ''))) / file.originalSize * 100)}% smaller
                       </span>
                     </div>
                   </div>

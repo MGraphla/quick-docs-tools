@@ -4,6 +4,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 // Set up PDF.js worker using the correct approach for Vite
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).toString();
@@ -431,24 +432,108 @@ export function createPdfProcessor() {
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-wordprocessingml.styles+xml"/>
+  <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-wordprocessingml.settings+xml"/>
+  <Override PartName="/word/webSettings.xml" ContentType="application/vnd.openxmlformats-wordprocessingml.webSettings+xml"/>
+  <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-wordprocessingml.fontTable+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
 </Types>`);
 
       zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
 </Relationships>`);
 
       zip.file('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings" Target="webSettings.xml"/>
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
 </Relationships>`);
 
+      // Add required Word document files
+      zip.file('word/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:spacing w:after="0" w:line="240" w:lineRule="auto"/>
+    </w:pPr>
+    <w:rPr>
+      <w:sz w:val="24"/>
+      <w:szCs w:val="24"/>
+      <w:lang w:val="en-US" w:eastAsia="en-US" w:bidi="ar-SA"/>
+    </w:rPr>
+  </w:style>
+</w:styles>`);
+
+      zip.file('word/settings.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:defaultTabStop w:val="720"/>
+  <w:characterSpacingControl w:val="doNotCompress"/>
+</w:settings>`);
+
+      zip.file('word/webSettings.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:optimizeForBrowser/>
+  <w:allowPNG/>
+</w:webSettings>`);
+
+      zip.file('word/fontTable.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:font w:name="Calibri">
+    <w:panose1 w:val="020F0502020204030204"/>
+    <w:charset w:val="00"/>
+    <w:family w:val="swiss"/>
+    <w:pitch w:val="variable"/>
+    <w:sig w:usb0="E4002EFF" w:usb1="C000247B" w:usb2="00000009" w:usb3="00000000" w:csb0="000001FF" w:csb1="00000000"/>
+  </w:font>
+</w:fonts>`);
+
+      zip.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" 
+                  xmlns:dc="http://purl.org/dc/elements/1.1/" 
+                  xmlns:dcterms="http://purl.org/dc/terms/" 
+                  xmlns:dcmitype="http://purl.org/dc/dcmitype/" 
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>PDF to Word Conversion</dc:title>
+  <dc:creator>QuickDocs</dc:creator>
+  <cp:lastModifiedBy>QuickDocs</cp:lastModifiedBy>
+  <cp:revision>1</cp:revision>
+  <dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified>
+</cp:coreProperties>`);
+
+      zip.file('docProps/app.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" 
+           xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>QuickDocs PDF to Word</Application>
+  <AppVersion>1.0.0</AppVersion>
+</Properties>`);
+
       // Create the main document with the extracted text
+      // Escape special characters and split by paragraphs
+      const paragraphs = fullText.split('\n\n').filter(p => p.trim());
+      
       const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
-    ${fullText.split('\n\n').map(paragraph => 
-      paragraph.trim() ? `<w:p><w:r><w:t>${paragraph.trim().replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>')}</w:t></w:r></w:p>` : ''
+    ${paragraphs.map(paragraph => 
+      `<w:p>
+        <w:r>
+          <w:t>${paragraph.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t>
+        </w:r>
+      </w:p>`
     ).join('')}
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
   </w:body>
 </w:document>`;
 
@@ -470,26 +555,183 @@ export function createPdfProcessor() {
   <Default Extension="jpeg" ContentType="image/jpeg"/>
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-presentationml.presentation.main+xml"/>
-  <Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-presentationml.slide+xml"/>
+  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+  <Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
+  <Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
+  ${images.map((_, index) => 
+    `<Override PartName="/ppt/slides/slide${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`
+  ).join('')}
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
 </Types>`);
 
-      // Add basic presentation structure
+      // Add relationships
+      zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>`);
+
+      // Create presentation.xml
       zip.file('ppt/presentation.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" 
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" 
+               xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
   <p:sldMasterIdLst>
     <p:sldMasterId id="2147483648" r:id="rId1"/>
   </p:sldMasterIdLst>
   <p:sldIdLst>
-    ${images.map((_, index) => `<p:sldId id="${index + 256}" r:id="rId${index + 2}"/>`).join('')}
+    ${images.map((_, index) => `<p:sldId id="${256 + index}" r:id="rId${index + 2}"/>`).join('')}
   </p:sldIdLst>
   <p:sldSz cx="9144000" cy="6858000" type="screen4x3"/>
+  <p:notesSz cx="6858000" cy="9144000"/>
+  <p:defaultTextStyle>
+    <!-- Default text style -->
+  </p:defaultTextStyle>
 </p:presentation>`);
 
-      // Add slides with images
-      images.forEach((imageData, index) => {
+      // Create presentation.xml.rels
+      zip.file('ppt/_rels/presentation.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>
+  ${images.map((_, index) => 
+    `<Relationship Id="rId${index + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${index + 1}.xml"/>`
+  ).join('')}
+</Relationships>`);
+
+      // Create slideMaster1.xml
+      zip.file('ppt/slideMasters/slideMaster1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" 
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" 
+            xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>
+    <p:bg>
+      <p:bgRef idx="1001">
+        <a:schemeClr val="bg1"/>
+      </p:bgRef>
+    </p:bg>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>
+</p:sldMaster>`);
+
+      // Create slideMaster1.xml.rels
+      zip.file('ppt/slideMasters/_rels/slideMaster1.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>
+</Relationships>`);
+
+      // Create theme1.xml
+      zip.file('ppt/theme/theme1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme">
+  <a:themeElements>
+    <a:clrScheme name="Office">
+      <a:dk1>
+        <a:sysClr val="windowText" lastClr="000000"/>
+      </a:dk1>
+      <a:lt1>
+        <a:sysClr val="window" lastClr="FFFFFF"/>
+      </a:lt1>
+      <a:dk2>
+        <a:srgbClr val="1F497D"/>
+      </a:dk2>
+      <a:lt2>
+        <a:srgbClr val="EEECE1"/>
+      </a:lt2>
+      <a:accent1>
+        <a:srgbClr val="4F81BD"/>
+      </a:accent1>
+      <a:accent2>
+        <a:srgbClr val="C0504D"/>
+      </a:accent2>
+      <a:accent3>
+        <a:srgbClr val="9BBB59"/>
+      </a:accent3>
+      <a:accent4>
+        <a:srgbClr val="8064A2"/>
+      </a:accent4>
+      <a:accent5>
+        <a:srgbClr val="4BACC6"/>
+      </a:accent5>
+      <a:accent6>
+        <a:srgbClr val="F79646"/>
+      </a:accent6>
+      <a:hlink>
+        <a:srgbClr val="0000FF"/>
+      </a:hlink>
+      <a:folHlink>
+        <a:srgbClr val="800080"/>
+      </a:folHlink>
+    </a:clrScheme>
+    <a:fontScheme name="Office">
+      <a:majorFont>
+        <a:latin typeface="Calibri"/>
+        <a:ea typeface=""/>
+        <a:cs typeface=""/>
+      </a:majorFont>
+      <a:minorFont>
+        <a:latin typeface="Calibri"/>
+        <a:ea typeface=""/>
+        <a:cs typeface=""/>
+      </a:minorFont>
+    </a:fontScheme>
+    <a:fmtScheme name="Office">
+      <!-- Format scheme content -->
+    </a:fmtScheme>
+  </a:themeElements>
+</a:theme>`);
+
+      // Create docProps files
+      zip.file('docProps/app.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" 
+           xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>QuickDocs PDF to PowerPoint</Application>
+  <Slides>${images.length}</Slides>
+</Properties>`);
+
+      zip.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" 
+                  xmlns:dc="http://purl.org/dc/elements/1.1/" 
+                  xmlns:dcterms="http://purl.org/dc/terms/" 
+                  xmlns:dcmitype="http://purl.org/dc/dcmitype/" 
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>PDF to PowerPoint Conversion</dc:title>
+  <dc:creator>QuickDocs</dc:creator>
+  <cp:lastModifiedBy>QuickDocs</cp:lastModifiedBy>
+  <cp:revision>1</cp:revision>
+  <dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified>
+</cp:coreProperties>`);
+
+      // Create slides folder
+      zip.folder('ppt/slides');
+      zip.folder('ppt/slides/_rels');
+
+      // Add each slide with its image
+      for (let i = 0; i < images.length; i++) {
+        const slideNum = i + 1;
+        const imageData = images[i].split(',')[1]; // Remove data URL prefix
+        
+        // Create slide XML
         const slideXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" 
+      xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" 
+      xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
   <p:cSld>
     <p:spTree>
       <p:nvGrpSpPr>
@@ -498,38 +740,59 @@ export function createPdfProcessor() {
         <p:nvPr/>
       </p:nvGrpSpPr>
       <p:grpSpPr>
-        <a:xfrm xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
       </p:grpSpPr>
       <p:pic>
         <p:nvPicPr>
-          <p:cNvPr id="2" name="Picture ${index + 1}"/>
-          <p:cNvPicPr/>
+          <p:cNvPr id="2" name="Slide Image"/>
+          <p:cNvPicPr>
+            <a:picLocks noChangeAspect="1"/>
+          </p:cNvPicPr>
           <p:nvPr/>
         </p:nvPicPr>
         <p:blipFill>
-          <a:blip r:embed="rId1" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
+          <a:blip r:embed="rId1"/>
           <a:stretch>
             <a:fillRect/>
           </a:stretch>
         </p:blipFill>
         <p:spPr>
-          <a:xfrm xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <a:xfrm>
             <a:off x="0" y="0"/>
             <a:ext cx="9144000" cy="6858000"/>
           </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
         </p:spPr>
       </p:pic>
     </p:spTree>
   </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
 </p:sld>`;
-        
-        zip.file(`ppt/slides/slide${index + 1}.xml`, slideXml);
-        
-        // Add image data (convert base64 to binary)
-        const imageBase64 = imageData.split(',')[1];
-        zip.file(`ppt/media/image${index + 1}.jpeg`, imageBase64, { base64: true });
-      });
 
+        // Create slide relationship XML
+        const slideRelXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${slideNum}.jpeg"/>
+</Relationships>`;
+
+        // Add slide files
+        zip.file(`ppt/slides/slide${slideNum}.xml`, slideXml);
+        zip.file(`ppt/slides/_rels/slide${slideNum}.xml.rels`, slideRelXml);
+        
+        // Add image
+        zip.file(`ppt/media/image${slideNum}.jpeg`, imageData, { base64: true });
+      }
+
+      // Generate the PPTX file
       const pptxBlob = await zip.generateAsync({ type: 'uint8array' });
       return pptxBlob;
     },
@@ -574,23 +837,64 @@ export function createPdfProcessor() {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       
-      let csvContent = '';
+      // Create a new workbook
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.utils.book_new();
       
-      // Extract text from each page and format as CSV
+      // Process each page
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
         
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(',');
+        // Extract text items with their positions
+        const textItems = textContent.items.map((item: any) => ({
+          text: item.str,
+          x: Math.round(item.transform[4]),
+          y: Math.round(item.transform[5]),
+          width: item.width,
+          height: item.height
+        }));
         
-        csvContent += pageText + '\n';
+        // Group text items by y-position (rows)
+        const rows: { [key: number]: any[] } = {};
+        const yTolerance = 5; // Items within this y-distance are considered on the same row
+        
+        textItems.forEach(item => {
+          // Find a row that's close enough to this item's y-position
+          const existingY = Object.keys(rows).find(y => 
+            Math.abs(parseInt(y) - item.y) < yTolerance
+          );
+          
+          const rowY = existingY ? parseInt(existingY) : item.y;
+          if (!rows[rowY]) rows[rowY] = [];
+          rows[rowY].push(item);
+        });
+        
+        // Sort rows by y-position (top to bottom)
+        const sortedRows = Object.entries(rows)
+          .sort((a, b) => parseInt(b[0]) - parseInt(a[0])) // Reverse order because PDF y-coordinates start from bottom
+          .map(([_, items]) => 
+            // Sort items in each row by x-position (left to right)
+            items.sort((a, b) => a.x - b.x).map(item => item.text)
+          );
+        
+        // Create worksheet data
+        const wsData = sortedRows.map(row => {
+          // If row has only one cell and it's empty, return an empty array
+          if (row.length === 1 && row[0].trim() === '') return [];
+          return row;
+        }).filter(row => row.length > 0); // Remove empty rows
+        
+        // Create worksheet and add to workbook
+        if (wsData.length > 0) {
+          const ws = XLSX.utils.aoa_to_sheet(wsData);
+          XLSX.utils.book_append_sheet(workbook, ws, `Page ${pageNum}`);
+        }
       }
-
-      // Convert CSV to Excel-like format (simplified)
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      return new Uint8Array(await blob.arrayBuffer());
+      
+      // Write workbook to array buffer
+      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      return new Uint8Array(wbout);
     },
 
     async mergePdfs(files: File[]): Promise<Uint8Array> {

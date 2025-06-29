@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Upload, FileDown, Download, Loader2, FileSpreadsheet, FileText, Eye, CheckCircle, AlertCircle, Settings, Zap, X } from "lucide-react";
+import { Upload, FileDown, Download, Loader2, FileText, FileSpreadsheet, Eye, CheckCircle, AlertCircle, Settings, Zap, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -153,9 +153,6 @@ const ExcelToPdfPage = () => {
           for (let sheetIndex = 0; sheetIndex < sheetsToProcess.length; sheetIndex++) {
             const sheetName = sheetsToProcess[sheetIndex];
             const worksheet = workbook.Sheets[sheetName];
-            
-            // Convert sheet to HTML
-            const html = XLSX.utils.sheet_to_html(worksheet, { id: 'table' });
             
             // Add sheet name as header if multiple sheets
             if (sheetsToProcess.length > 1 && sheetIndex > 0) {

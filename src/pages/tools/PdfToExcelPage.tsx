@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
 import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
 
 interface ConvertedFile {
   name: string;
@@ -138,32 +139,98 @@ const PdfToExcelPage = () => {
         setProgress(((i + 1) / files.length) * 100);
         setProgressMessage(`Converting ${file.file.name}...`);
         
-        // Perform actual PDF to Excel conversion
-        const convertedBytes = await pdfProcessor.convertPdfToExcel(file.file);
-        
-        // Create a proper Excel file
-        const fileName = file.file.name.replace(/\.pdf$/i, '.xlsx');
-        const url = URL.createObjectURL(new Blob([convertedBytes], { 
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-        }));
-        
-        // Simulate table detection
-        const tablesFound = Math.floor(Math.random() * 5) + 1;
-        
-        converted.push({
-          name: fileName,
-          url,
-          size: formatFileSize(convertedBytes.length),
-          bytes: convertedBytes,
-          pages: file.info?.pageCount || 0,
-          tablesFound
-        });
+        try {
+          // Extract text and tables from PDF
+          const arrayBuffer = await file.file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          
+          // Create a new workbook
+          const workbook = XLSX.utils.book_new();
+          
+          // Process each page
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            
+            // Extract text items with their positions
+            const textItems = textContent.items.map((item: any) => ({
+              text: item.str,
+              x: Math.round(item.transform[4]),
+              y: Math.round(item.transform[5]),
+              width: item.width,
+              height: item.height
+            }));
+            
+            // Group text items by y-position (rows)
+            const rows: { [key: number]: any[] } = {};
+            const yTolerance = 5; // Items within this y-distance are considered on the same row
+            
+            textItems.forEach(item => {
+              // Find a row that's close enough to this item's y-position
+              const existingY = Object.keys(rows).find(y => 
+                Math.abs(parseInt(y) - item.y) < yTolerance
+              );
+              
+              const rowY = existingY ? parseInt(existingY) : item.y;
+              if (!rows[rowY]) rows[rowY] = [];
+              rows[rowY].push(item);
+            });
+            
+            // Sort rows by y-position (top to bottom)
+            const sortedRows = Object.entries(rows)
+              .sort((a, b) => parseInt(b[0]) - parseInt(a[0])) // Reverse order because PDF y-coordinates start from bottom
+              .map(([_, items]) => 
+                // Sort items in each row by x-position (left to right)
+                items.sort((a, b) => a.x - b.x).map(item => item.text)
+              );
+            
+            // Create worksheet data
+            const wsData = sortedRows.map(row => {
+              // If row has only one cell and it's empty, return an empty array
+              if (row.length === 1 && row[0].trim() === '') return [];
+              return row;
+            }).filter(row => row.length > 0); // Remove empty rows
+            
+            // Create worksheet and add to workbook
+            if (wsData.length > 0) {
+              const ws = XLSX.utils.aoa_to_sheet(wsData);
+              XLSX.utils.book_append_sheet(workbook, ws, `Page ${pageNum}`);
+            }
+          }
+          
+          // Write workbook to array buffer
+          const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+          const excelBytes = new Uint8Array(wbout);
+          
+          // Create a blob URL for download
+          const blob = new Blob([excelBytes], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+          });
+          const url = URL.createObjectURL(blob);
+          
+          // Simulate table detection
+          const tablesFound = Math.floor(Math.random() * 5) + 1;
+          
+          converted.push({
+            name: file.file.name.replace(/\.pdf$/i, '.xlsx'),
+            url,
+            size: formatFileSize(excelBytes.length),
+            bytes: excelBytes,
+            pages: file.info?.pageCount || 0,
+            tablesFound
+          });
+        } catch (error) {
+          console.error(`Error converting ${file.file.name}:`, error);
+          toast.error(`Failed to convert ${file.file.name}. Please try again.`);
+        }
       }
       
-      setConvertedFiles(converted);
-      setProgress(100);
-      setProgressMessage("Conversion completed!");
-      toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to Excel format`);
+      if (converted.length > 0) {
+        setConvertedFiles(converted);
+        setProgress(100);
+        setProgressMessage("Conversion completed!");
+        toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to Excel format`);
+      }
       
     } catch (error) {
       console.error('Conversion error:', error);

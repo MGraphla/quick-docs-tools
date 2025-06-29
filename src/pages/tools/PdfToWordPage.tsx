@@ -129,9 +129,10 @@ const PdfToWordPage = () => {
           
           // Create a proper Word document file
           const fileName = file.file.name.replace(/\.pdf$/i, '.docx');
-          const url = URL.createObjectURL(new Blob([convertedBytes], { 
+          const blob = new Blob([convertedBytes], { 
             type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-          }));
+          });
+          const url = URL.createObjectURL(blob);
           
           converted.push({
             name: fileName,

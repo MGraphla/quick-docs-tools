@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
 import { saveAs } from 'file-saver';
+import JSZip from 'jszip';
 
 interface ConvertedFile {
   name: string;
@@ -27,9 +28,9 @@ const PdfToPowerpointPage = () => {
   const [convertedFiles, setConvertedFiles] = useState<ConvertedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [progressMessage, setProgressMessage] = useState("");
-  const [slideLayout, setSlideLayout] = useState("auto");
-  const [preserveImages, setPreserveImages] = useState(true);
+  const [conversionQuality, setConversionQuality] = useState("high");
   const [preserveFormatting, setPreserveFormatting] = useState(true);
+  const [preserveImages, setPreserveImages] = useState(true);
   const [oneSlidePerPage, setOneSlidePerPage] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfProcessor = createPdfProcessor();
@@ -129,9 +130,10 @@ const PdfToPowerpointPage = () => {
           
           // Create a proper PowerPoint file
           const fileName = file.file.name.replace(/\.pdf$/i, '.pptx');
-          const url = URL.createObjectURL(new Blob([convertedBytes], { 
+          const blob = new Blob([convertedBytes], { 
             type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
-          }));
+          });
+          const url = URL.createObjectURL(blob);
           
           converted.push({
             name: fileName,
@@ -261,16 +263,15 @@ const PdfToPowerpointPage = () => {
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label>Slide Layout</Label>
-                <Select value={slideLayout} onValueChange={setSlideLayout}>
+                <Label>Conversion Quality</Label>
+                <Select value={conversionQuality} onValueChange={setConversionQuality}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">Auto-detect Layout</SelectItem>
-                    <SelectItem value="standard">Standard (4:3)</SelectItem>
-                    <SelectItem value="widescreen">Widescreen (16:9)</SelectItem>
-                    <SelectItem value="custom">Custom Layout</SelectItem>
+                    <SelectItem value="high">High Quality (Slower)</SelectItem>
+                    <SelectItem value="balanced">Balanced (Recommended)</SelectItem>
+                    <SelectItem value="fast">Fast (Basic conversion)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
