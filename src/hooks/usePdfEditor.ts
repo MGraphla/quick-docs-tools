@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
@@ -81,8 +80,8 @@ export const usePdfEditor = () => {
       content: editTool === 'text' ? textInput || 'Sample Text' : undefined,
       fontSize: fontSize[0],
       color: textColor,
-      width: editTool === 'highlight' ? 100 : editTool === 'shape' ? 80 : undefined,
-      height: editTool === 'highlight' ? 20 : editTool === 'shape' ? 80 : undefined,
+      width: editTool === 'highlight' ? 100 : editTool === 'shape' || editTool === 'rectangle' || editTool === 'circle' ? 80 : undefined,
+      height: editTool === 'highlight' ? 20 : editTool === 'shape' || editTool === 'rectangle' || editTool === 'circle' ? 80 : undefined,
       shapeType: editTool === 'rectangle' ? 'rectangle' : editTool === 'circle' ? 'circle' : undefined,
       imageData: editTool === 'image' ? selectedImage : undefined
     };
