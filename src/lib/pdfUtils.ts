@@ -4,11 +4,9 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
-// Import the worker as a URL
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
-// Set up PDF.js worker using the imported URL
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+// Set up PDF.js worker using Vite-compatible URL resolution
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url).toString();
 
 export interface PdfInfo {
   pageCount: number;
