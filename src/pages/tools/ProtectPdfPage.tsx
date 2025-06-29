@@ -27,6 +27,7 @@ const ProtectPdfPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | ''>('');
   const [securityLevel, setSecurityLevel] = useState("128bit");
+  const [targetFilename, setTargetFilename] = useState("");
   const [permissions, setPermissions] = useState({
     printing: true,
     copying: true,
@@ -62,6 +63,12 @@ const ProtectPdfPage = () => {
         size: formatFileSize(selectedFile.size),
         pages: info.pageCount
       });
+      
+      // Set default target filename
+      const originalName = selectedFile.name;
+      const nameWithoutExt = originalName.replace(/\.pdf$/i, '');
+      setTargetFilename(`${nameWithoutExt}-protected.pdf`);
+      
       setProtectedFile(null);
       toast.success(`PDF loaded: ${info.pageCount} pages`);
     } catch (error) {
@@ -136,6 +143,11 @@ const ProtectPdfPage = () => {
         return;
       }
     }
+    
+    if (!targetFilename) {
+      toast.error("Please enter a target filename");
+      return;
+    }
 
     setProcessing(true);
     setProgress(0);
@@ -164,7 +176,7 @@ const ProtectPdfPage = () => {
       const url = URL.createObjectURL(blob);
       
       setProtectedFile({
-        name: `protected-${file.name}`,
+        name: targetFilename,
         url: url,
         size: formatFileSize(blob.size)
       });
@@ -200,6 +212,27 @@ const ProtectPdfPage = () => {
       case 'strong': return 'bg-green-500';
       default: return 'bg-gray-200';
     }
+  };
+
+  const resetForm = () => {
+    setFile(null);
+    setFileInfo(null);
+    setPassword("");
+    setConfirmPassword("");
+    setTargetFilename("");
+    setProtectedFile(null);
+    setPasswordStrength("");
+    
+    // Reset permissions to defaults
+    setPermissions({
+      printing: true,
+      copying: true,
+      editing: false,
+      commenting: true,
+      formFilling: true,
+      contentExtraction: false,
+      documentAssembly: false
+    });
   };
 
   return (
@@ -265,7 +298,7 @@ const ProtectPdfPage = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  Document Info
+                  Source PDF File
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -290,6 +323,18 @@ const ProtectPdfPage = () => {
                       This file is currently unprotected. Add password protection to secure your document.
                     </AlertDescription>
                   </Alert>
+                  
+                  <div className="space-y-2">
+                    <Label>Target PDF File</Label>
+                    <Input
+                      placeholder="protected-document.pdf"
+                      value={targetFilename}
+                      onChange={(e) => setTargetFilename(e.target.value)}
+                    />
+                    <p className="text-xs text-gray-500">
+                      Enter the filename for your protected PDF
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -525,6 +570,15 @@ const ProtectPdfPage = () => {
                         Protect PDF
                       </>
                     )}
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={resetForm}
+                    disabled={processing}
+                    className="sm:w-auto"
+                  >
+                    Reset
                   </Button>
                 </div>
                 
