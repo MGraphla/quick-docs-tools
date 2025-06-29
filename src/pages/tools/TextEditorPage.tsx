@@ -1,12 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { 
-  Type, Download, Bold, Italic, Underline, List, ListOrdered, Link as LinkIcon, 
-  Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, AlignJustify, 
-  Heading1, Heading2, Heading3, FileText, CheckCircle, AlertCircle, 
-  Printer, Spellcheck, ZoomIn, ZoomOut, Undo, Redo, Palette, 
-  Highlighter, Strikethrough, Indent, Outdent, LineHeight, 
-  Eraser, Save, ChevronDown, Code, Quote, Paperclip, MessageSquare
-} from "lucide-react";
+import { Type, Download, Bold, Italic, Underline, List, ListOrdered, Link as LinkIcon, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, AlignJustify, Heading1, Heading2, Heading3, FileText, CheckCircle, AlertCircle, Printer, SpellCheck as Spellcheck, ZoomIn, ZoomOut, Undo, Redo, Palette, Highlighter, Strikethrough, Indent, Outdent, Weight as LineHeight, Eraser, Save, ChevronDown, Code, Quote, Paperclip, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
