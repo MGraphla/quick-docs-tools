@@ -75,10 +75,10 @@ const AuthModal = ({ open, onOpenChange, mode, onModeChange, onSuccess }: AuthMo
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md" aria-labelledby="auth-modal-title" aria-describedby="auth-modal-description">
+        <DialogTitle id="auth-modal-title">
+          {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
+        </DialogTitle>
         <DialogHeader>
-          <DialogTitle id="auth-modal-title">
-            {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
-          </DialogTitle>
           <DialogDescription id="auth-modal-description">
             {mode === 'signin' 
               ? 'Sign in to access your PDF tools and documents' 
