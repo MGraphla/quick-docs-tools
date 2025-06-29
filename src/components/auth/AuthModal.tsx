@@ -74,7 +74,7 @@ const AuthModal = ({ open, onOpenChange, mode, onModeChange, onSuccess }: AuthMo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" aria-describedby="auth-modal-description">
+      <DialogContent className="sm:max-w-md" aria-labelledby="auth-modal-title" aria-describedby="auth-modal-description">
         <DialogHeader>
           <DialogTitle id="auth-modal-title">
             {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
