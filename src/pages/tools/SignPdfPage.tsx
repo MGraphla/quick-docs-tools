@@ -12,7 +12,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
 import SignatureCanvas from 'react-signature-canvas';
-import Draggable from "react-draggable";
 
 interface SignedFile {
   name: string;
@@ -171,8 +170,10 @@ const SignPdfPage = () => {
   };
 
   const clearSignaturePad = () => {
-    signaturePadRef.current?.clear();
-    toast.success("Signature pad cleared");
+    if (signaturePadRef.current) {
+      signaturePadRef.current.clear();
+      toast.success("Signature pad cleared");
+    }
   };
 
   const savePdf = async () => {
@@ -209,6 +210,15 @@ const SignPdfPage = () => {
       let currentPdfBytes = await file.arrayBuffer();
       
       for (const position of signaturePositions) {
+        let signatureData = null;
+        
+        // Get signature data based on type
+        if (signatureType === 'draw' && signaturePadRef.current) {
+          signatureData = signaturePadRef.current.toDataURL('image/png');
+        } else if (signatureType === 'image' && signatureImage) {
+          signatureData = signatureImage;
+        }
+        
         const signatureOptions = {
           type: signatureType,
           x: position.x,
@@ -220,7 +230,7 @@ const SignPdfPage = () => {
           fontSize: fontSize[0],
           color: textColor,
           fontFamily,
-          signatureData: signatureType === 'image' ? signatureImage : undefined,
+          signatureData: signatureType !== 'text' ? signatureData : undefined,
           canvas: signatureType === 'draw' ? signaturePadRef.current?.getCanvas() : undefined
         };
 
@@ -424,9 +434,8 @@ const SignPdfPage = () => {
                           <SelectItem value="Arial">Arial</SelectItem>
                           <SelectItem value="Times New Roman">Times New Roman</SelectItem>
                           <SelectItem value="Courier New">Courier New</SelectItem>
-                          <SelectItem value="Dancing Script">Dancing Script</SelectItem>
-                          <SelectItem value="Pacifico">Pacifico</SelectItem>
-                          <SelectItem value="Satisfy">Satisfy</SelectItem>
+                          <SelectItem value="Georgia">Georgia</SelectItem>
+                          <SelectItem value="Verdana">Verdana</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

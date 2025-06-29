@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback } from "react";
 import { Upload, FileText, Download, Droplets, Type, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, Settings, RotateCw, Palette, Move, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,6 +36,8 @@ const WatermarkPdfPage = () => {
   const [progressMessage, setProgressMessage] = useState("");
   const [watermarkedFile, setWatermarkedFile] = useState<WatermarkedFile | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageImage, setPageImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pdfProcessor = createPdfProcessor();
@@ -60,6 +61,11 @@ const WatermarkPdfPage = () => {
         pages: info.pageCount
       });
       setWatermarkedFile(null);
+      setCurrentPage(1);
+      
+      // Render the first page for preview
+      await renderCurrentPage(selectedFile, 1);
+      
       toast.success(`PDF loaded: ${info.pageCount} pages`);
     } catch (error) {
       console.error('Error loading PDF:', error);
@@ -68,6 +74,24 @@ const WatermarkPdfPage = () => {
       toast.dismiss(loadingToast);
     }
   }, []);
+
+  const renderCurrentPage = async (pdfFile: File, pageNum: number) => {
+    try {
+      const imageData = await pdfProcessor.renderPdfPage(pdfFile, pageNum, 1.5);
+      setPageImage(imageData);
+    } catch (error) {
+      console.error('Error rendering page:', error);
+      toast.error("Failed to render PDF page");
+    }
+  };
+
+  const changePage = async (newPage: number) => {
+    if (!fileInfo || !file) return;
+    if (newPage < 1 || newPage > fileInfo.pages) return;
+    
+    setCurrentPage(newPage);
+    await renderCurrentPage(file, newPage);
+  };
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -271,6 +295,28 @@ const WatermarkPdfPage = () => {
                       </div>
                     </div>
                   </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => changePage(currentPage - 1)}
+                      disabled={currentPage <= 1}
+                    >
+                      Previous
+                    </Button>
+                    <div className="text-sm">
+                      Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{fileInfo.pages}</span>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => changePage(currentPage + 1)}
+                      disabled={currentPage >= fileInfo.pages}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -471,6 +517,86 @@ const WatermarkPdfPage = () => {
                       max={45}
                       step={5}
                     />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Document Preview */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Document Preview</CardTitle>
+                <CardDescription>
+                  Preview your document with watermark (page {currentPage} of {fileInfo.pages})
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-gray-100 p-4 rounded-lg flex items-center justify-center">
+                  <div className="bg-white shadow-lg rounded-lg overflow-hidden relative" style={{ width: '400px', height: '566px' }}>
+                    {pageImage ? (
+                      <div className="relative w-full h-full">
+                        <img 
+                          src={pageImage} 
+                          alt={`Page ${currentPage}`}
+                          className="w-full h-full object-contain"
+                        />
+                        
+                        {/* Watermark Preview Overlay */}
+                        {watermarkType === 'text' && textWatermark && (
+                          <div 
+                            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                            style={{
+                              opacity: opacity[0] / 100,
+                            }}
+                          >
+                            <div
+                              style={{
+                                color: textColor,
+                                fontSize: `${fontSize[0] * 0.67}px`, // Scale down for preview
+                                transform: `rotate(${rotation[0]}deg)`,
+                                position: 'absolute',
+                                ...(position === 'center' ? { top: '50%', left: '50%', transform: `translate(-50%, -50%) rotate(${rotation[0]}deg)` } :
+                                   position === 'top-left' ? { top: '10%', left: '10%' } :
+                                   position === 'top-right' ? { top: '10%', right: '10%' } :
+                                   position === 'bottom-left' ? { bottom: '10%', left: '10%' } :
+                                   { bottom: '10%', right: '10%' })
+                              }}
+                            >
+                              {textWatermark}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {watermarkType === 'image' && imagePreview && (
+                          <div 
+                            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                            style={{
+                              opacity: opacity[0] / 100,
+                            }}
+                          >
+                            <img
+                              src={imagePreview}
+                              alt="Watermark"
+                              style={{
+                                maxWidth: '50%',
+                                maxHeight: '50%',
+                                transform: `rotate(${rotation[0]}deg)`,
+                                position: 'absolute',
+                                ...(position === 'center' ? { top: '50%', left: '50%', transform: `translate(-50%, -50%) rotate(${rotation[0]}deg)` } :
+                                   position === 'top-left' ? { top: '10%', left: '10%' } :
+                                   position === 'top-right' ? { top: '10%', right: '10%' } :
+                                   position === 'bottom-left' ? { bottom: '10%', left: '10%' } :
+                                   { bottom: '10%', right: '10%' })
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

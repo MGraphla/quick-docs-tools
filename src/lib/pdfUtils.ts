@@ -6,7 +6,7 @@ import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
 
 // Set up PDF.js worker using Vite-compatible approach
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url).toString();
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js';
 
 export interface PdfInfo {
   pageCount: number;
@@ -817,7 +817,7 @@ export function createPdfProcessor() {
       
       if (type === 'draw' && canvas) {
         try {
-          // Convert canvas to image data without using the removed canvasToUint8Array function
+          // Convert canvas to image data
           const imageDataUrl = canvas.toDataURL('image/png');
           const imageBytes = Uint8Array.from(atob(imageDataUrl.split(',')[1]), c => c.charCodeAt(0));
           const embeddedImage = await pdf.embedPng(imageBytes);
