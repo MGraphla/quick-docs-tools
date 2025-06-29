@@ -130,7 +130,7 @@ export function createPdfProcessor() {
       const protectionPage = pdfDoc.insertPage(0, [612, 792]);
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       
-      protectionPage.drawText('🔒 PASSWORD PROTECTED DOCUMENT', {
+      protectionPage.drawText('PASSWORD PROTECTED DOCUMENT', {
         x: 50,
         y: 700,
         size: 20,
@@ -447,7 +447,7 @@ export function createPdfProcessor() {
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
     ${fullText.split('\n\n').map(paragraph => 
-      paragraph.trim() ? `<w:p><w:r><w:t>${paragraph.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t></w:r></w:p>` : ''
+      paragraph.trim() ? `<w:p><w:r><w:t>${paragraph.trim().replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>')}</w:t></w:r></w:p>` : ''
     ).join('')}
   </w:body>
 </w:document>`;
