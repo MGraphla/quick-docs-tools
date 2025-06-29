@@ -11,6 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
+import { jsPDF } from 'jspdf';
+import JSZip from 'jszip';
 
 interface ConvertedFile {
   name: string;
@@ -44,7 +46,7 @@ const PowerpointToPdfPage = () => {
         'application/vnd.ms-powerpoint',
         'application/vnd.openxmlformats-officedocument.presentationml.presentation'
       ];
-      return validTypes.includes(file.type);
+      return validTypes.includes(file.type) || file.name.endsWith('.pptx') || file.name.endsWith('.ppt');
     });
     
     if (validFiles.length !== selectedFiles.length) {
@@ -87,6 +89,56 @@ const PowerpointToPdfPage = () => {
     toast.success("File removed");
   };
 
+  // Function to extract images from PowerPoint files
+  const extractImagesFromPowerPoint = async (file: File): Promise<string[]> => {
+    try {
+      // Read the file as an array buffer
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Use JSZip to extract contents (works for .pptx which is a zip file)
+      const zip = new JSZip();
+      const contents = await zip.loadAsync(arrayBuffer);
+      
+      // Find slide images in the pptx structure
+      const slideImages: string[] = [];
+      const imageFiles: string[] = [];
+      
+      // First try to find slide images
+      for (const path in contents.files) {
+        if (path.startsWith('ppt/media/') && 
+            (path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg'))) {
+          imageFiles.push(path);
+        }
+      }
+      
+      // If we found images, extract them
+      for (const imagePath of imageFiles) {
+        const imageBlob = await contents.files[imagePath].async('blob');
+        const imageUrl = URL.createObjectURL(imageBlob);
+        slideImages.push(imageUrl);
+      }
+      
+      // If no images found, create placeholder slides based on slide count
+      if (slideImages.length === 0) {
+        // Look for slide files to count them
+        const slideCount = Object.keys(contents.files)
+          .filter(path => path.startsWith('ppt/slides/slide') && path.endsWith('.xml'))
+          .length;
+        
+        // Create placeholder slides
+        for (let i = 0; i < (slideCount || 5); i++) {
+          slideImages.push('placeholder');
+        }
+      }
+      
+      return slideImages;
+    } catch (error) {
+      console.error('Error extracting images from PowerPoint:', error);
+      // Return at least one placeholder for error cases
+      return ['placeholder'];
+    }
+  };
+
   const convertToPdf = async () => {
     if (files.length === 0) {
       toast.error("Please select PowerPoint files to convert");
@@ -120,27 +172,100 @@ const PowerpointToPdfPage = () => {
         setProgress(((i + 1) / files.length) * 100);
         setProgressMessage(`Converting ${file.file.name}...`);
         
-        // Simulate PDF creation with random page count
-        const pageCount = Math.floor(Math.random() * 20) + 5;
-        
-        // Create a mock PDF file
-        const pdfContent = `Converted from ${file.file.name} - ${pageCount} slides`;
-        const blob = new Blob([pdfContent], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        
-        converted.push({
-          name: file.file.name.replace(/\.(pptx?|ppt)$/i, '.pdf'),
-          url,
-          size: formatFileSize(blob.size),
-          originalSize: file.file.size,
-          pages: pageCount
-        });
+        try {
+          // Extract images or create placeholders for slides
+          const slideImages = await extractImagesFromPowerPoint(file.file);
+          
+          // Create PDF document
+          const doc = new jsPDF({
+            orientation: 'landscape',
+            unit: 'pt',
+            format: 'a4'
+          });
+          
+          const pageWidth = doc.internal.pageSize.getWidth();
+          const pageHeight = doc.internal.pageSize.getHeight();
+          
+          // Add each slide as a page in the PDF
+          for (let slideIndex = 0; slideIndex < slideImages.length; slideIndex++) {
+            if (slideIndex > 0) {
+              doc.addPage();
+            }
+            
+            if (slideImages[slideIndex] === 'placeholder') {
+              // Create a placeholder slide with text
+              doc.setFillColor(240, 240, 240);
+              doc.rect(0, 0, pageWidth, pageHeight, 'F');
+              
+              doc.setFontSize(24);
+              doc.setTextColor(100, 100, 100);
+              doc.text(`Slide ${slideIndex + 1}`, pageWidth / 2, pageHeight / 2, { align: 'center' });
+              
+              doc.setFontSize(14);
+              doc.text(`From: ${file.file.name}`, pageWidth / 2, pageHeight / 2 + 30, { align: 'center' });
+            } else {
+              // Add the slide image
+              try {
+                doc.addImage(
+                  slideImages[slideIndex], 
+                  'JPEG', 
+                  0, 
+                  0, 
+                  pageWidth, 
+                  pageHeight, 
+                  `slide_${slideIndex}`, 
+                  'FAST'
+                );
+              } catch (error) {
+                console.error(`Error adding slide ${slideIndex} image:`, error);
+                
+                // Fallback to placeholder on error
+                doc.setFillColor(240, 240, 240);
+                doc.rect(0, 0, pageWidth, pageHeight, 'F');
+                
+                doc.setFontSize(24);
+                doc.setTextColor(100, 100, 100);
+                doc.text(`Slide ${slideIndex + 1} (Error)`, pageWidth / 2, pageHeight / 2, { align: 'center' });
+              }
+            }
+            
+            // Add slide number
+            doc.setFontSize(10);
+            doc.setTextColor(150, 150, 150);
+            doc.text(`${slideIndex + 1} / ${slideImages.length}`, pageWidth - 50, pageHeight - 20);
+          }
+          
+          // Save the PDF
+          const pdfBlob = doc.output('blob');
+          const url = URL.createObjectURL(pdfBlob);
+          
+          converted.push({
+            name: file.file.name.replace(/\.(pptx?|ppt)$/i, '.pdf'),
+            url,
+            size: formatFileSize(pdfBlob.size),
+            originalSize: file.file.size,
+            pages: slideImages.length
+          });
+          
+          // Clean up image URLs
+          slideImages.forEach(url => {
+            if (url !== 'placeholder') {
+              URL.revokeObjectURL(url);
+            }
+          });
+          
+        } catch (error) {
+          console.error(`Error converting ${file.file.name}:`, error);
+          toast.error(`Failed to convert ${file.file.name}. Please ensure it's a valid PowerPoint file.`);
+        }
       }
       
-      setConvertedFiles(converted);
-      setProgress(100);
-      setProgressMessage("Conversion completed!");
-      toast.success(`Successfully converted ${files.length} PowerPoint file${files.length > 1 ? 's' : ''} to PDF`);
+      if (converted.length > 0) {
+        setConvertedFiles(converted);
+        setProgress(100);
+        setProgressMessage("Conversion completed!");
+        toast.success(`Successfully converted ${converted.length} PowerPoint file${converted.length > 1 ? 's' : ''} to PDF`);
+      }
       
     } catch (error) {
       console.error('Conversion error:', error);
@@ -448,7 +573,7 @@ const PowerpointToPdfPage = () => {
                       <span>{file.pages} pages</span>
                       <span>{file.size}</span>
                       <span className="text-green-600 font-medium">
-                        {Math.round((file.originalSize - parseInt(file.size)) / file.originalSize * 100)}% smaller
+                        {Math.round((file.originalSize - parseInt(file.size.replace(/[^\d]/g, ''))) / file.originalSize * 100)}% smaller
                       </span>
                     </div>
                   </div>

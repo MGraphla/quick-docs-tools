@@ -11,6 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface ConvertedFile {
   name: string;
@@ -43,9 +46,11 @@ const ExcelToPdfPage = () => {
     const validFiles = Array.from(selectedFiles).filter(file => {
       const validTypes = [
         'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.xls',
+        '.xlsx'
       ];
-      return validTypes.includes(file.type);
+      return validTypes.includes(file.type) || file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
     });
     
     if (validFiles.length !== selectedFiles.length) {
@@ -121,27 +126,112 @@ const ExcelToPdfPage = () => {
         setProgress(((i + 1) / files.length) * 100);
         setProgressMessage(`Converting ${file.file.name}...`);
         
-        // Simulate PDF creation with random page count
-        const pageCount = Math.floor(Math.random() * 5) + 1;
-        
-        // Create a mock PDF file
-        const pdfContent = `Converted from ${file.file.name} - ${pageCount} pages`;
-        const blob = new Blob([pdfContent], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        
-        converted.push({
-          name: file.file.name.replace(/\.(xlsx?|xls)$/i, '.pdf'),
-          url,
-          size: formatFileSize(blob.size),
-          originalSize: file.file.size,
-          pages: pageCount
-        });
+        try {
+          // Read the Excel file
+          const data = await file.file.arrayBuffer();
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          // Determine which sheets to process
+          let sheetsToProcess = [];
+          if (selectedSheet === "all") {
+            sheetsToProcess = workbook.SheetNames;
+          } else if (selectedSheet === "active") {
+            sheetsToProcess = [workbook.SheetNames[0]]; // Use first sheet as active
+          } else {
+            sheetsToProcess = [workbook.SheetNames[0]]; // Default to first sheet
+          }
+          
+          // Create PDF document
+          const doc = new jsPDF({
+            orientation: orientation === "landscape" ? "landscape" : "portrait",
+            unit: "pt"
+          });
+          
+          let pageCount = 0;
+          
+          // Process each sheet
+          for (let sheetIndex = 0; sheetIndex < sheetsToProcess.length; sheetIndex++) {
+            const sheetName = sheetsToProcess[sheetIndex];
+            const worksheet = workbook.Sheets[sheetName];
+            
+            // Convert sheet to HTML
+            const html = XLSX.utils.sheet_to_html(worksheet, { id: 'table' });
+            
+            // Add sheet name as header if multiple sheets
+            if (sheetsToProcess.length > 1 && sheetIndex > 0) {
+              doc.addPage();
+            }
+            
+            if (sheetsToProcess.length > 1) {
+              doc.setFontSize(16);
+              doc.text(sheetName, 40, 40);
+              pageCount++;
+            }
+            
+            // Convert to table format for jsPDF-AutoTable
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            
+            if (jsonData.length > 0) {
+              // Get column headers
+              const headers = Object.keys(jsonData[0]);
+              
+              // Get data rows
+              const data = jsonData.map(row => headers.map(header => row[header]));
+              
+              // Add table to PDF
+              (doc as any).autoTable({
+                head: [headers],
+                body: data,
+                startY: sheetsToProcess.length > 1 ? 60 : 40,
+                theme: 'grid',
+                styles: {
+                  fontSize: 10,
+                  cellPadding: 5,
+                  lineColor: showGridlines ? [0, 0, 0] : [255, 255, 255],
+                  lineWidth: showGridlines ? 0.1 : 0
+                },
+                headStyles: {
+                  fillColor: [220, 220, 220],
+                  textColor: [0, 0, 0],
+                  fontStyle: 'bold'
+                },
+                margin: { top: 40 },
+                didDrawPage: () => {
+                  pageCount++;
+                }
+              });
+            } else {
+              // Empty sheet
+              doc.setFontSize(12);
+              doc.text("No data in this sheet", 40, sheetsToProcess.length > 1 ? 80 : 60);
+              pageCount++;
+            }
+          }
+          
+          // Save the PDF
+          const pdfBlob = doc.output('blob');
+          const url = URL.createObjectURL(pdfBlob);
+          
+          converted.push({
+            name: file.file.name.replace(/\.(xlsx?|xls)$/i, '.pdf'),
+            url,
+            size: formatFileSize(pdfBlob.size),
+            originalSize: file.file.size,
+            pages: pageCount > 0 ? pageCount : 1
+          });
+          
+        } catch (error) {
+          console.error(`Error converting ${file.file.name}:`, error);
+          toast.error(`Failed to convert ${file.file.name}. Please ensure it's a valid Excel file.`);
+        }
       }
       
-      setConvertedFiles(converted);
-      setProgress(100);
-      setProgressMessage("Conversion completed!");
-      toast.success(`Successfully converted ${files.length} Excel file${files.length > 1 ? 's' : ''} to PDF`);
+      if (converted.length > 0) {
+        setConvertedFiles(converted);
+        setProgress(100);
+        setProgressMessage("Conversion completed!");
+        toast.success(`Successfully converted ${converted.length} Excel file${converted.length > 1 ? 's' : ''} to PDF`);
+      }
       
     } catch (error) {
       console.error('Conversion error:', error);
@@ -462,7 +552,7 @@ const ExcelToPdfPage = () => {
                       <span>{file.pages} page{file.pages > 1 ? 's' : ''}</span>
                       <span>{file.size}</span>
                       <span className="text-green-600 font-medium">
-                        {Math.round((file.originalSize - parseInt(file.size)) / file.originalSize * 100)}% smaller
+                        {Math.round((file.originalSize - parseInt(file.size.replace(/[^\d]/g, ''))) / file.originalSize * 100)}% smaller
                       </span>
                     </div>
                   </div>
