@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul"
-import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
+import { Root as VisuallyHiddenRoot } from "@radix-ui/react-visually-hidden"
 
 import { cn } from "@/lib/utils"
 
@@ -48,7 +48,7 @@ const DrawerContent = React.forwardRef<
       {...props}
     >
       <DrawerPrimitive.Title className="sr-only">
-        <VisuallyHidden.Root>Drawer</VisuallyHidden.Root>
+        <VisuallyHiddenRoot>Drawer</VisuallyHiddenRoot>
       </DrawerPrimitive.Title>
       <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
       {children}

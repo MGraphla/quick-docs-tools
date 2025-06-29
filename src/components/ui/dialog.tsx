@@ -1,7 +1,7 @@
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
-import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
+import { Root as VisuallyHiddenRoot } from "@radix-ui/react-visually-hidden"
 
 import { cn } from "@/lib/utils"
 

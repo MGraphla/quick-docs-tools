@@ -1,6 +1,6 @@
 import * as React from "react"
 import * as HoverCardPrimitive from "@radix-ui/react-hover-card"
-import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
+import { Root as VisuallyHiddenRoot } from "@radix-ui/react-visually-hidden"
 
 import { cn } from "@/lib/utils"
 
@@ -24,7 +24,7 @@ const HoverCardContent = React.forwardRef<
       {...props}
     >
       <HoverCardPrimitive.Title className="sr-only">
-        <VisuallyHidden.Root>Hover Card Content</VisuallyHidden.Root>
+        <VisuallyHiddenRoot>Hover Card Content</VisuallyHiddenRoot>
       </HoverCardPrimitive.Title>
       {props.children}
     </HoverCardPrimitive.Content>

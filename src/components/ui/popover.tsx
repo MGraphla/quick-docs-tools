@@ -1,6 +1,6 @@
 import * as React from "react"
 import * as PopoverPrimitive from "@radix-ui/react-popover"
-import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
+import { Root as VisuallyHiddenRoot } from "@radix-ui/react-visually-hidden"
 
 import { cn } from "@/lib/utils"
 
@@ -24,7 +24,7 @@ const PopoverContent = React.forwardRef<
       {...props}
     >
       <PopoverPrimitive.Title className="sr-only">
-        <VisuallyHidden.Root>Popover Content</VisuallyHidden.Root>
+        <VisuallyHiddenRoot>Popover Content</VisuallyHiddenRoot>
       </PopoverPrimitive.Title>
       {props.children}
     </PopoverPrimitive.Content>
