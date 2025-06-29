@@ -5,8 +5,8 @@ import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 import jsPDF from 'jspdf';
 
-// Set up PDF.js worker using a reliable CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.js';
+// Set up PDF.js worker using local file
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 
 export interface PdfInfo {
   pageCount: number;
@@ -53,6 +53,81 @@ export function parsePageRanges(ranges: string, totalPages: number): PageRange[]
   }
   
   return pageRanges;
+}
+
+// Simple encryption/decryption using AES-GCM
+async function encryptData(data: Uint8Array, password: string): Promise<{ encrypted: Uint8Array; iv: Uint8Array; salt: Uint8Array }> {
+  const encoder = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  
+  // Derive key from password
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+  
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+  
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv },
+    key,
+    data
+  );
+  
+  return {
+    encrypted: new Uint8Array(encrypted),
+    iv,
+    salt
+  };
+}
+
+async function decryptData(encryptedData: Uint8Array, password: string, iv: Uint8Array, salt: Uint8Array): Promise<Uint8Array> {
+  const encoder = new TextEncoder();
+  
+  // Derive key from password
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+  
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+  
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: iv },
+    key,
+    encryptedData
+  );
+  
+  return new Uint8Array(decrypted);
 }
 
 export function createPdfProcessor() {
@@ -114,37 +189,69 @@ export function createPdfProcessor() {
 
     async protectPdf(file: File, password: string, permissions: any = {}): Promise<Uint8Array> {
       const arrayBuffer = await file.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const originalData = new Uint8Array(arrayBuffer);
       
-      // Add metadata to indicate protection (simulated encryption for demo)
-      pdfDoc.setTitle(`Protected: ${file.name}`);
-      pdfDoc.setSubject('This document is password protected');
-      pdfDoc.setKeywords(['password-protected', `${password.length}-char-password`]);
+      // Encrypt the PDF data
+      const { encrypted, iv, salt } = await encryptData(originalData, password);
       
-      // Store encrypted password hash in metadata
-      const encoder = new TextEncoder();
-      const data = encoder.encode(password);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      // Create a new PDF document that contains the encrypted data and metadata
+      const protectedPdf = await PDFDocument.create();
+      const page = protectedPdf.addPage([612, 792]); // Standard letter size
       
-      pdfDoc.setCreator(`Protected with hash: ${hashHex}`);
+      // Add metadata to indicate this is a protected PDF
+      protectedPdf.setTitle(`Protected: ${file.name}`);
+      protectedPdf.setSubject('This document is password protected');
+      protectedPdf.setCreator('PDF Protection Tool');
       
-      // Add custom metadata about permissions
-      const permissionsString = Object.entries(permissions)
-        .map(([key, value]) => `${key}:${value ? 'allowed' : 'denied'}`)
-        .join(',');
+      // Store encryption metadata in the PDF (base64 encoded)
+      const metadataString = JSON.stringify({
+        iv: Array.from(iv),
+        salt: Array.from(salt),
+        originalName: file.name,
+        permissions: permissions,
+        encryptedSize: encrypted.length
+      });
       
-      pdfDoc.setProducer(`Permissions: ${permissionsString}`);
+      protectedPdf.setKeywords(btoa(metadataString));
       
-      return await pdfDoc.save();
+      // Store the encrypted data as base64 in the producer field (split into chunks if needed)
+      const encryptedBase64 = btoa(String.fromCharCode(...encrypted));
+      protectedPdf.setProducer(encryptedBase64);
+      
+      // Add a visible message on the page
+      const font = await protectedPdf.embedFont(StandardFonts.Helvetica);
+      page.drawText('This PDF is password protected.', {
+        x: 50,
+        y: 700,
+        size: 16,
+        font,
+        color: rgb(0, 0, 0)
+      });
+      
+      page.drawText('Use the unlock feature with the correct password to access the content.', {
+        x: 50,
+        y: 670,
+        size: 12,
+        font,
+        color: rgb(0.5, 0.5, 0.5)
+      });
+      
+      page.drawText(`Original file: ${file.name}`, {
+        x: 50,
+        y: 640,
+        size: 10,
+        font,
+        color: rgb(0.7, 0.7, 0.7)
+      });
+      
+      return await protectedPdf.save();
     },
 
     async unlockPdf(file: File, password: string): Promise<Uint8Array> {
       const arrayBuffer = await file.arrayBuffer();
       
       try {
-        // Try to load with password first
+        // First, try to load as a regular password-protected PDF
         const pdf = await pdfjsLib.getDocument({ 
           data: arrayBuffer,
           password: password
@@ -152,25 +259,6 @@ export function createPdfProcessor() {
         
         // If successful, create unlocked version
         const pdfDoc = await PDFDocument.load(arrayBuffer);
-        
-        // Check if password matches our protection scheme
-        const creator = pdfDoc.getCreator();
-        if (creator && creator.includes('Protected with hash:')) {
-          const hashHex = creator.split('Protected with hash: ')[1];
-          
-          // Verify password
-          const encoder = new TextEncoder();
-          const data = encoder.encode(password);
-          const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-          const hashArray = Array.from(new Uint8Array(hashBuffer));
-          const computedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-          
-          if (computedHash !== hashHex) {
-            throw new Error('Invalid password');
-          }
-        }
-        
-        // Create unlocked version
         const unlockedPdf = await PDFDocument.create();
         const pages = await unlockedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
         
@@ -183,10 +271,38 @@ export function createPdfProcessor() {
         
         return await unlockedPdf.save();
       } catch (error: any) {
-        if (error.name === 'PasswordException' || error.message?.includes('password')) {
-          throw new Error('Invalid password. Please check your password and try again.');
+        // If regular PDF unlock fails, try our custom encryption
+        try {
+          const pdfDoc = await PDFDocument.load(arrayBuffer);
+          
+          // Check if this is our custom protected PDF
+          const keywords = pdfDoc.getKeywords();
+          const producer = pdfDoc.getProducer();
+          
+          if (!keywords || !producer) {
+            throw new Error('Invalid password or unsupported encryption method.');
+          }
+          
+          // Decode metadata
+          const metadata = JSON.parse(atob(keywords));
+          const iv = new Uint8Array(metadata.iv);
+          const salt = new Uint8Array(metadata.salt);
+          
+          // Decode encrypted data
+          const encryptedData = new Uint8Array(
+            atob(producer).split('').map(char => char.charCodeAt(0))
+          );
+          
+          // Decrypt the original PDF data
+          const decryptedData = await decryptData(encryptedData, password, iv, salt);
+          
+          return decryptedData;
+        } catch (decryptError: any) {
+          if (decryptError.message?.includes('decrypt')) {
+            throw new Error('Invalid password. Please check your password and try again.');
+          }
+          throw new Error('Failed to unlock PDF. The file may be corrupted or use unsupported encryption.');
         }
-        throw new Error('Failed to unlock PDF. The file may be corrupted or use unsupported encryption.');
       }
     },
 
@@ -372,7 +488,7 @@ export function createPdfProcessor() {
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
     ${fullText.split('\n\n').map(paragraph => 
-      paragraph.trim() ? `<w:p><w:r><w:t>${paragraph.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t></w:r></w:p>` : ''
+      paragraph.trim() ? `<w:p><w:r><w:t>${paragraph.trim().replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>')}</w:t></w:r></w:p>` : ''
     ).join('')}
   </w:body>
 </w:document>`;
