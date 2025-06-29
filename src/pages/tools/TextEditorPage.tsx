@@ -16,7 +16,7 @@ import pdfFonts from 'pdfmake/build/vfs_fonts';
 import htmlToPdfmake from 'html-to-pdfmake';
 
 // Initialize pdfMake with fonts
-pdfMake.vfs = pdfFonts.pdfMake.vfs;
+pdfMake.vfs = pdfFonts.vfs;
 
 const TextEditorPage = () => {
   const [content, setContent] = useState('');
