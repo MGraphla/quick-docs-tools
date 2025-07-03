@@ -268,7 +268,7 @@ const EditPdfPage = () => {
                               {edit.content}
                             </div>
                           );
-                        } else if (edit.type === 'rectangle') {
+                        } else if (edit.type === 'shape' && edit.shapeType === 'rectangle') {
                           return (
                             <div
                               key={index}
@@ -283,7 +283,7 @@ const EditPdfPage = () => {
                               }}
                             ></div>
                           );
-                        } else if (edit.type === 'circle') {
+                        } else if (edit.type === 'shape' && edit.shapeType === 'circle') {
                           return (
                             <div
                               key={index}

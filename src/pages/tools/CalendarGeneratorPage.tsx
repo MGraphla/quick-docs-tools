@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Calendar as CalendarIcon, Download, Plus, Trash2, CheckCircle, AlertCircle, Settings, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -94,9 +95,9 @@ const CalendarGeneratorPage = () => {
     setIsGenerating(true);
     
     try {
-      // Create new PDF document
+      // Create new PDF document with proper typing
       const doc = new jsPDF({
-        orientation: layout,
+        orientation: layout as "portrait" | "landscape", // Fix type casting
         unit: 'mm',
         format: 'a4'
       });
