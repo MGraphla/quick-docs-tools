@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Save, Download, Upload, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Undo, Redo, Type, FileText, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,19 +10,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { formatFileSize } from "@/lib/pdfUtils";
 
-// Simplified Quill interface
+// Simplified Quill interface - using actual Quill methods
 interface QuillEditor {
   root: HTMLElement;
   getText: () => string;
-  getHTML: () => string;
+  getContents: () => any;
   setText: (text: string) => void;
-  setHTML: (html: string) => void;
+  setContents: (contents: any) => void;
   format: (name: string, value: any) => void;
   getSelection: () => { index: number; length: number } | null;
   setSelection: (index: number, length?: number) => void;
   on: (event: string, callback: Function) => void;
   off: (event: string, callback: Function) => void;
-  // Removed history property to fix TypeScript errors
 }
 
 const TextEditorPage = () => {
@@ -66,8 +66,8 @@ const TextEditorPage = () => {
           // Handle content changes
           quill.on('text-change', () => {
             const text = quill.getText();
-            const html = quill.getHTML();
-            setContent(html);
+            const contents = quill.getContents();
+            setContent(text);
             
             // Update word and character count
             const words = text.trim().split(/\s+/).filter(word => word.length > 0);
@@ -75,10 +75,10 @@ const TextEditorPage = () => {
             setCharCount(text.length);
             
             // Save to undo stack
-            setUndoStack(prev => [...prev.slice(-9), html]);
+            setUndoStack(prev => [...prev.slice(-9), JSON.stringify(contents)]);
           });
 
-          quillRef.current = quill as QuillEditor;
+          quillRef.current = quill as unknown as QuillEditor;
         }
       } catch (error) {
         console.error('Failed to load Quill editor:', error);
@@ -97,8 +97,13 @@ const TextEditorPage = () => {
       setRedoStack(prev => [...prev, currentContent]);
       setUndoStack(prev => prev.slice(0, -1));
       
-      quillRef.current.setHTML(previousContent);
-      setContent(previousContent);
+      try {
+        const contents = JSON.parse(previousContent);
+        (quillRef.current as any).setContents(contents);
+        setContent((quillRef.current as any).getText());
+      } catch (error) {
+        console.error('Error with undo:', error);
+      }
     }
   };
 
@@ -109,8 +114,13 @@ const TextEditorPage = () => {
       setUndoStack(prev => [...prev, contentToRestore]);
       setRedoStack(prev => prev.slice(0, -1));
       
-      quillRef.current.setHTML(contentToRestore);
-      setContent(contentToRestore);
+      try {
+        const contents = JSON.parse(contentToRestore);
+        (quillRef.current as any).setContents(contents);
+        setContent((quillRef.current as any).getText());
+      } catch (error) {
+        console.error('Error with redo:', error);
+      }
     }
   };
 
@@ -123,7 +133,7 @@ const TextEditorPage = () => {
       const text = e.target?.result as string;
       if (quillRef.current) {
         if (file.type === 'text/html' || file.name.endsWith('.html')) {
-          quillRef.current.setHTML(text);
+          (quillRef.current as any).root.innerHTML = text;
         } else {
           quillRef.current.setText(text);
         }
@@ -132,11 +142,7 @@ const TextEditorPage = () => {
       }
     };
     
-    if (file.type === 'text/html' || file.name.endsWith('.html')) {
-      reader.readAsText(file);
-    } else {
-      reader.readAsText(file);
-    }
+    reader.readAsText(file);
   };
 
   const saveAsText = () => {
@@ -165,7 +171,7 @@ const TextEditorPage = () => {
     
     setSaving(true);
     try {
-      const html = quillRef.current.getHTML();
+      const html = (quillRef.current as any).root.innerHTML;
       const fullHTML = `
 <!DOCTYPE html>
 <html lang="en">
