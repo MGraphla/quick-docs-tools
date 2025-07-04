@@ -1,3 +1,4 @@
+
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,28 +11,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Settings, LogOut, Search, Bell, HelpCircle, Menu } from "lucide-react";
-import { useState } from "react";
+import { User, Settings, LogOut, Search, Bell, HelpCircle } from "lucide-react";
 
 export function DashboardHeader() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
   return (
     <header className="flex items-center justify-between border-b bg-white/50 backdrop-blur-sm px-4 sm:px-6 py-3 sticky top-0 z-40">
       <div className="flex items-center gap-4">
-        <div className="hidden md:flex">
-          <SidebarTrigger className="hover:bg-gray-100 transition-colors" />
-        </div>
-        <div className="md:hidden">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="p-1"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </div>
+        <SidebarTrigger className="hover:bg-gray-100 transition-colors" />
         <div className="hidden md:flex">
           <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Dashboard
