@@ -88,11 +88,13 @@ const EditPdfPage = () => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    const pdfX = (x / rect.width) * 595;
-    const pdfY = (y / rect.height) * 842;
+    // Convert coordinates to PDF scale
+    const pdfX = (x / rect.width) * 595; // Standard PDF width
+    const pdfY = (y / rect.height) * 842; // Standard PDF height
     
     addEdit(editTool, pdfX, pdfY, textInput, fontSize, textColor, selectedImage);
     
+    // Close mobile tools panel after adding an edit on mobile
     if (isMobileView) {
       setSheetOpen(false);
     }
@@ -266,7 +268,7 @@ const EditPdfPage = () => {
                               {edit.content}
                             </div>
                           );
-                        } else if (edit.type === 'shape' && editTool === 'rectangle') {
+                        } else if (edit.type === 'rectangle') {
                           return (
                             <div
                               key={index}
@@ -281,7 +283,7 @@ const EditPdfPage = () => {
                               }}
                             ></div>
                           );
-                        } else if (edit.type === 'shape' && editTool === 'circle') {
+                        } else if (edit.type === 'circle') {
                           return (
                             <div
                               key={index}
@@ -304,8 +306,8 @@ const EditPdfPage = () => {
                               style={{
                                 left: `${(edit.x / 595) * 100}%`,
                                 top: `${(edit.y / 842) * 100}%`,
-                                width: `${(edit.width || 100) / 595 * 100}%`,
-                                height: `${(edit.height || 20) / 842 * 100}%`,
+                                width: `${(edit.width / 595) * 100}%`,
+                                height: `${(edit.height / 842) * 100}%`,
                                 backgroundColor: edit.color,
                                 opacity: 0.3,
                               }}

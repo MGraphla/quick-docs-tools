@@ -245,28 +245,25 @@ const RedactPdfPage = () => {
       // Find text matches
       const matches: RedactionArea[] = [];
       
-      textContent.items.forEach((item: any) => {
-        if (item.str && typeof item.str === 'string') {
-          // Use proper typing for text items
-          const textItem = item as { str: string; transform: number[]; width: number };
-          if (textItem.str.toLowerCase().includes(searchText.toLowerCase())) {
-            // Get the position and dimensions of the text
-            const tx = textItem.transform;
-            const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]));
-            
-            const match: RedactionArea = {
-              id: generateId(),
-              page: currentPage,
-              x: tx[4],
-              y: tx[5] - fontHeight,
-              width: textItem.width,
-              height: fontHeight + 2, // Add a little padding
-            };
-            
-            matches.push(match);
-          }
+      for (const item of textContent.items) {
+        const textItem = item as pdfjsLib.TextItem;
+        if (textItem.str.toLowerCase().includes(searchText.toLowerCase())) {
+          // Get the position and dimensions of the text
+          const tx = textItem.transform;
+          const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]));
+          
+          const match: RedactionArea = {
+            id: generateId(),
+            page: currentPage,
+            x: tx[4],
+            y: tx[5] - fontHeight,
+            width: textItem.width,
+            height: fontHeight + 2, // Add a little padding
+          };
+          
+          matches.push(match);
         }
-      });
+      }
       
       if (matches.length > 0) {
         setTextMatches(matches);
@@ -345,13 +342,14 @@ const RedactPdfPage = () => {
           const x = redaction.x;
           const y = height - redaction.y - redaction.height;
           
-          // Draw black rectangle with proper RGB type
+          // Draw black rectangle
           page.drawRectangle({
-            x: redaction.x,
-            y: page.getHeight() - redaction.y - redaction.height,
+            x,
+            y,
             width: redaction.width,
             height: redaction.height,
-            color: { type: 'rgb', red: 0, green: 0, blue: 0 },
+            color: { r: 0, g: 0, b: 0 },
+            opacity: 1
           });
         });
       }

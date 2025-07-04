@@ -85,10 +85,12 @@ const AudioTrimmerPage = () => {
       return;
     }
     
+    // Clean up previous audio URL
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
     }
     
+    // Clean up previous WaveSurfer instance
     if (wavesurferRef.current) {
       wavesurferRef.current.destroy();
     }
@@ -102,12 +104,14 @@ const AudioTrimmerPage = () => {
     setStartTime(0);
     setEndTime(0);
     
+    // Create audio element to get duration
     const audio = new Audio(url);
     audio.onloadedmetadata = () => {
       setDuration(audio.duration);
       setEndTime(audio.duration);
     };
     
+    // Initialize WaveSurfer
     if (waveformRef.current) {
       const wavesurfer = WaveSurfer.create({
         container: waveformRef.current,
@@ -118,7 +122,8 @@ const AudioTrimmerPage = () => {
         barGap: 1,
         barRadius: 3,
         height: 100,
-        normalize: true
+        normalize: true,
+        responsive: true
       });
       
       wavesurfer.load(url);
@@ -132,6 +137,7 @@ const AudioTrimmerPage = () => {
       wavesurfer.on('audioprocess', () => {
         setCurrentTime(wavesurfer.getCurrentTime());
         
+        // Stop playback if we reach the end time
         if (wavesurfer.getCurrentTime() >= endTime) {
           wavesurfer.pause();
           wavesurfer.seekTo(startTime / duration);
@@ -139,10 +145,11 @@ const AudioTrimmerPage = () => {
         }
       });
       
-      wavesurfer.on('interaction', () => {
+      wavesurfer.on('seek', () => {
         const currentTime = wavesurfer.getCurrentTime();
         setCurrentTime(currentTime);
         
+        // If seeking outside the trim range, adjust to the range
         if (currentTime < startTime) {
           wavesurfer.seekTo(startTime / duration);
         } else if (currentTime > endTime) {

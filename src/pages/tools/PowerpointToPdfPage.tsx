@@ -13,7 +13,6 @@ import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
-import { jsPDF } from 'jspdf';
 
 interface ConvertedFile {
   name: string;
