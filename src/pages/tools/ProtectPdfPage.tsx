@@ -168,8 +168,11 @@ const ProtectPdfPage = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // Fix: Use the actual PDF protection method with correct parameters (file, password)
-      const protectedPdfBytes = await pdfProcessor.protectPdf(file, password);
+      // Fix: Use the actual PDF protection method with correct parameters (file, password, options)
+      const protectedPdfBytes = await pdfProcessor.protectPdf(file, password, {
+        securityLevel,
+        permissions
+      });
       
       // Create a blob and URL for download
       const blob = new Blob([protectedPdfBytes], { type: 'application/pdf' });
