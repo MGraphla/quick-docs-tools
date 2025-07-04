@@ -1,10 +1,9 @@
-
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument } from 'pdf-lib';
 import { PdfEdit } from '@/types/pdfEdit';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+// Configure PDF.js worker with the correct version
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js`;
 
 export interface PdfInfo {
   pageCount: number;
@@ -57,6 +56,8 @@ export const createPdfProcessor = () => {
       const arrayBuffer = await file.arrayBuffer();
       const loadingTask = pdfjsLib.getDocument({ 
         data: arrayBuffer,
+        cMapUrl: `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/cmaps/`,
+        cMapPacked: true,
       });
       const pdf = await loadingTask.promise;
       
@@ -84,7 +85,11 @@ export const createPdfProcessor = () => {
   const renderPdfPage = async (file: File, pageNum: number, scale: number = 1.5): Promise<string> => {
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const loadingTask = pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        cMapUrl: `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/cmaps/`,
+        cMapPacked: true,
+      });
       const pdf = await loadingTask.promise;
       const page = await pdf.getPage(pageNum);
       
@@ -113,7 +118,11 @@ export const createPdfProcessor = () => {
   const convertPdfToImages = async (file: File, options = { scale: 2, format: 'jpeg', quality: 0.8 }) => {
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const loadingTask = pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        cMapUrl: `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/cmaps/`,
+        cMapPacked: true,
+      });
       const pdf = await loadingTask.promise;
       
       const images = [];
@@ -251,7 +260,7 @@ export const createPdfProcessor = () => {
     }
   };
 
-  const protectPdf = async (file: File, password: string): Promise<Uint8Array> => {
+  const protectPdf = async (file: File, password: string, options: any): Promise<Uint8Array> => {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
@@ -276,7 +285,7 @@ export const createPdfProcessor = () => {
     }
   };
 
-  const addSignature = async (file: File, signature: string, x: number, y: number, page: number): Promise<Uint8Array> => {
+  const addSignature = async (file: File, signatureData: string, x: number, y: number, page: number): Promise<Uint8Array> => {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
