@@ -124,12 +124,8 @@ const PdfToJpgPage = () => {
         setProgress((fileIndex / files.length) * 100);
         
         try {
-          // Get quality multiplier based on resolution setting
-          const qualityMultiplier = resolution === "high" ? 2 : 
-                                   resolution === "medium" ? 1.5 : 1;
-          
-          // Convert PDF to images using real conversion
-          const images = await pdfProcessor.convertPdfToImages(file.file, qualityMultiplier);
+          // Convert PDF to images using single argument
+          const images = await pdfProcessor.convertPdfToImages(file.file);
           
           const fileImages = images.map((imageData, pageIndex) => ({
             id: generateId(),

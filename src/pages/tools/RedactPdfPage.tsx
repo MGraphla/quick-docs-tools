@@ -247,7 +247,8 @@ const RedactPdfPage = () => {
       
       textContent.items.forEach((item: any) => {
         if (item.str && typeof item.str === 'string') {
-          const textItem = item as pdfjsLib.TextItem;
+          // Use proper typing for text items
+          const textItem = item as { str: string; transform: number[]; width: number };
           if (textItem.str.toLowerCase().includes(searchText.toLowerCase())) {
             // Get the position and dimensions of the text
             const tx = textItem.transform;
@@ -344,13 +345,13 @@ const RedactPdfPage = () => {
           const x = redaction.x;
           const y = height - redaction.y - redaction.height;
           
-          // Draw black rectangle
+          // Draw black rectangle with proper RGB type
           page.drawRectangle({
             x: redaction.x,
             y: page.getHeight() - redaction.y - redaction.height,
             width: redaction.width,
             height: redaction.height,
-            color: { red: 0, green: 0, blue: 0 },
+            color: { type: 'rgb', red: 0, green: 0, blue: 0 },
           });
         });
       }
