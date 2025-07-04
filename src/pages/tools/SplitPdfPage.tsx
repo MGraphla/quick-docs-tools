@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback } from "react";
 import { Upload, FileText, Download, Loader2, CheckCircle, AlertCircle, Settings, Zap, X, Save, ListOrdered, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,13 +11,37 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { createPdfProcessor, formatFileSize, parsePageRanges } from "@/lib/pdfUtils";
+import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
 
 interface SplitFile {
   name: string;
   url: string;
   size: string;
 }
+
+const parsePageRanges = (ranges: string, totalPages: number): number[] => {
+  const pages: number[] = [];
+  const parts = ranges.split(',');
+  
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed.includes('-')) {
+      const [start, end] = trimmed.split('-').map(n => parseInt(n.trim()));
+      for (let i = start; i <= Math.min(end, totalPages); i++) {
+        if (i >= 1 && !pages.includes(i)) {
+          pages.push(i);
+        }
+      }
+    } else {
+      const pageNum = parseInt(trimmed);
+      if (pageNum >= 1 && pageNum <= totalPages && !pages.includes(pageNum)) {
+        pages.push(pageNum);
+      }
+    }
+  }
+  
+  return pages.sort((a, b) => a - b);
+};
 
 const SplitPdfPage = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -126,19 +149,19 @@ const SplitPdfPage = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      let ranges: { start: number; end: number; }[] = [];
+      let pagesToSplit: number[] = [];
       
       if (splitType === "range") {
-        ranges = parsePageRanges(pageRanges, fileInfo.pages);
+        pagesToSplit = parsePageRanges(pageRanges, fileInfo.pages);
       } else if (splitType === "pages") {
-        ranges = selectedPages.map(page => ({ start: page, end: page }));
+        pagesToSplit = selectedPages;
       } else if (splitType === "every") {
         for (let i = 1; i <= fileInfo.pages; i++) {
-          ranges.push({ start: i, end: i });
+          pagesToSplit.push(i);
         }
       }
 
-      const results = await pdfProcessor.splitPdf(file, ranges);
+      const results = await pdfProcessor.splitPdf(file, pagesToSplit);
       
       const splitFiles = results.map((data, index) => ({
         name: `split-${index + 1}-${file.name}`,
