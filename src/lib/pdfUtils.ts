@@ -2,8 +2,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument } from 'pdf-lib';
 import { PdfEdit } from '@/types/pdfEdit';
 
-// Configure PDF.js worker with the correct version
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js`;
+// Configure PDF.js worker with a different CDN to avoid CORS issues
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.js`;
 
 export interface PdfInfo {
   pageCount: number;
@@ -56,7 +56,7 @@ export const createPdfProcessor = () => {
       const arrayBuffer = await file.arrayBuffer();
       const loadingTask = pdfjsLib.getDocument({ 
         data: arrayBuffer,
-        cMapUrl: `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/cmaps/`,
+        cMapUrl: `https://unpkg.com/pdfjs-dist@4.4.168/cmaps/`,
         cMapPacked: true,
       });
       const pdf = await loadingTask.promise;
@@ -87,7 +87,7 @@ export const createPdfProcessor = () => {
       const arrayBuffer = await file.arrayBuffer();
       const loadingTask = pdfjsLib.getDocument({ 
         data: arrayBuffer,
-        cMapUrl: `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/cmaps/`,
+        cMapUrl: `https://unpkg.com/pdfjs-dist@4.4.168/cmaps/`,
         cMapPacked: true,
       });
       const pdf = await loadingTask.promise;
@@ -120,7 +120,7 @@ export const createPdfProcessor = () => {
       const arrayBuffer = await file.arrayBuffer();
       const loadingTask = pdfjsLib.getDocument({ 
         data: arrayBuffer,
-        cMapUrl: `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/cmaps/`,
+        cMapUrl: `https://unpkg.com/pdfjs-dist@4.4.168/cmaps/`,
         cMapPacked: true,
       });
       const pdf = await loadingTask.promise;
