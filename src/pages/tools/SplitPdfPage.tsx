@@ -11,37 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
+import { createPdfProcessor, formatFileSize, parsePageRanges } from "@/lib/pdfUtils";
 
 interface SplitFile {
   name: string;
   url: string;
   size: string;
 }
-
-const parsePageRanges = (ranges: string, totalPages: number): number[] => {
-  const pages: number[] = [];
-  const parts = ranges.split(',');
-  
-  for (const part of parts) {
-    const trimmed = part.trim();
-    if (trimmed.includes('-')) {
-      const [start, end] = trimmed.split('-').map(n => parseInt(n.trim()));
-      for (let i = start; i <= Math.min(end, totalPages); i++) {
-        if (i >= 1 && !pages.includes(i)) {
-          pages.push(i);
-        }
-      }
-    } else {
-      const pageNum = parseInt(trimmed);
-      if (pageNum >= 1 && pageNum <= totalPages && !pages.includes(pageNum)) {
-        pages.push(pageNum);
-      }
-    }
-  }
-  
-  return pages.sort((a, b) => a - b);
-};
 
 const SplitPdfPage = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -116,7 +92,7 @@ const SplitPdfPage = () => {
   };
 
   const splitPdf = async () => {
-    if (!file || !fileInfo) {
+    if (!file) {
       toast.error("Please select a PDF file");
       return;
     }
@@ -149,19 +125,19 @@ const SplitPdfPage = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      let pagesToSplit: number[] = [];
+      let ranges: { start: number; end: number; }[] = [];
       
       if (splitType === "range") {
-        pagesToSplit = parsePageRanges(pageRanges, fileInfo.pages);
+        ranges = parsePageRanges(pageRanges, fileInfo.pages);
       } else if (splitType === "pages") {
-        pagesToSplit = selectedPages;
+        ranges = selectedPages.map(page => ({ start: page, end: page }));
       } else if (splitType === "every") {
         for (let i = 1; i <= fileInfo.pages; i++) {
-          pagesToSplit.push(i);
+          ranges.push({ start: i, end: i });
         }
       }
 
-      const results = await pdfProcessor.splitPdf(file, pagesToSplit);
+      const results = await pdfProcessor.splitPdf(file, ranges);
       
       const splitFiles = results.map((data, index) => ({
         name: `split-${index + 1}-${file.name}`,
@@ -192,15 +168,8 @@ const SplitPdfPage = () => {
     toast.success(`Downloaded ${splitFile.name}`);
   };
 
-  const downloadAll = () => {
-    splitFiles.forEach((file, index) => {
-      setTimeout(() => downloadSplitFile(file), index * 300);
-    });
-    toast.success(`Downloading ${splitFiles.length} files...`);
-  };
-
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6 max-w-6xl">
+    <div className="container mx-auto px-4 py-6 space-y-6 max-w-5xl">
       {/* Header */}
       <div className="text-center">
         <div className="inline-flex items-center bg-orange-100 text-orange-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
@@ -255,9 +224,9 @@ const SplitPdfPage = () => {
 
       {/* PDF Split Interface */}
       {file && fileInfo && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Sidebar - Split Settings */}
-          <div className="lg:col-span-1 space-y-6">
+          <div className="lg:col-span-4 space-y-6">
             <Card className="shadow-sm hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -299,14 +268,17 @@ const SplitPdfPage = () => {
               <CardContent>
                 <Tabs value={splitType} onValueChange={setSplitType} className="w-full">
                   <TabsList className="grid grid-cols-3 mb-4 w-full">
-                    <TabsTrigger value="range" className="text-xs sm:text-sm">
-                      Range
+                    <TabsTrigger value="range" className="flex items-center gap-1">
+                      <ListOrdered className="h-4 w-4" />
+                      <span className="hidden sm:inline">Range</span>
                     </TabsTrigger>
-                    <TabsTrigger value="pages" className="text-xs sm:text-sm">
-                      Pages
+                    <TabsTrigger value="pages" className="flex items-center gap-1">
+                      <ListChecks className="h-4 w-4" />
+                      <span className="hidden sm:inline">Pages</span>
                     </TabsTrigger>
-                    <TabsTrigger value="every" className="text-xs sm:text-sm">
-                      Every
+                    <TabsTrigger value="every" className="flex items-center gap-1">
+                      <Zap className="h-4 w-4" />
+                      <span className="hidden sm:inline">Every</span>
                     </TabsTrigger>
                   </TabsList>
                   
@@ -333,11 +305,11 @@ const SplitPdfPage = () => {
                           {selectedPages.length} selected
                         </span>
                       </Label>
-                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
+                      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
                         {Array.from({ length: fileInfo.pages }, (_, i) => i + 1).map(pageNumber => (
                           <div 
                             key={pageNumber} 
-                            className={`flex items-center justify-center h-8 rounded-md cursor-pointer transition-colors text-sm ${
+                            className={`flex items-center justify-center h-8 rounded-md cursor-pointer transition-colors ${
                               selectedPages.includes(pageNumber) 
                                 ? 'bg-orange-500 text-white' 
                                 : 'bg-gray-100 hover:bg-orange-100 text-gray-700'
@@ -381,7 +353,7 @@ const SplitPdfPage = () => {
                     </>
                   ) : (
                     <>
-                      <Zap className="h-5 w-5 mr-2" />
+                      <ListOrdered className="h-5 w-5 mr-2" />
                       Split PDF
                     </>
                   )}
@@ -390,8 +362,8 @@ const SplitPdfPage = () => {
             </Card>
           </div>
 
-          {/* Right Content Area */}
-          <div className="lg:col-span-2 space-y-6">
+          {/* Main Content - Split Results */}
+          <div className="lg:col-span-8 space-y-6">
             {/* Processing Progress */}
             {processing && (
               <Card className="border-orange-200 shadow-sm">
@@ -402,7 +374,7 @@ const SplitPdfPage = () => {
                     </div>
                     <h3 className="text-lg font-semibold mb-2">Splitting PDF</h3>
                     <p className="text-gray-600 mb-4">
-                      {progressMessage || "Processing your PDF split request..."}
+                      {progressMessage || "Splitting your document into multiple files..."}
                     </p>
                     <div className="max-w-md mx-auto">
                       <div className="flex justify-between text-sm mb-2">
@@ -416,53 +388,34 @@ const SplitPdfPage = () => {
               </Card>
             )}
 
-            {/* Split Results */}
+            {/* Split Files */}
             {splitFiles.length > 0 ? (
-              <Card className="border-green-200 bg-green-50 shadow-sm">
-                <CardHeader>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                        Split Files ({splitFiles.length})
-                      </CardTitle>
-                      <CardDescription>
-                        Your PDF has been successfully split
-                      </CardDescription>
-                    </div>
-                    <Button onClick={downloadAll} className="bg-green-600 hover:bg-green-700">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download All
-                    </Button>
-                  </div>
+              <Card className="border-green-200 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    Split Results
+                  </CardTitle>
+                  <CardDescription>
+                    Your PDF has been split into {splitFiles.length} files
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {splitFiles.map((file, index) => (
-                      <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-white rounded-lg shadow-sm">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-lg shrink-0">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {splitFiles.map((splitFile, index) => (
+                      <div key={index} className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-all duration-200 transform hover:scale-[1.02]">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-lg">
                             <FileText className="h-5 w-5 text-green-600" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="secondary" className="text-xs">
-                                Split #{index + 1}
-                              </Badge>
-                              <h4 className="font-medium text-gray-900 truncate">
-                                {file.name}
-                              </h4>
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {file.size}
-                            </div>
+                            <h4 className="font-medium text-gray-900 truncate">{splitFile.name}</h4>
+                            <Badge variant="secondary" className="bg-green-100 text-green-800">{splitFile.size}</Badge>
                           </div>
                         </div>
                         <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => downloadSplitFile(file)}
-                          className="w-full sm:w-auto"
+                          onClick={() => downloadSplitFile(splitFile)}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white"
                         >
                           <Download className="h-4 w-4 mr-2" />
                           Download
@@ -473,30 +426,29 @@ const SplitPdfPage = () => {
                 </CardContent>
               </Card>
             ) : (
-              !processing && (
-                <Card className="shadow-sm h-full flex flex-col justify-center">
+              !processing && file && (
+                <Card className="border-orange-100 shadow-sm h-full flex flex-col justify-center">
                   <CardContent className="p-8">
                     <div className="text-center">
                       <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-100 rounded-full mb-4">
                         <ListOrdered className="h-8 w-8 text-orange-600" />
                       </div>
                       <h3 className="text-lg font-semibold mb-2">Ready to Split</h3>
-                      <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                        Configure your split settings on the left and click "Split PDF" to create separate files.
+                      <p className="text-gray-600 mb-4 max-w-md mx-auto">
+                        Configure your split settings on the left and click "Split PDF" to extract pages from your document.
                       </p>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
-                        <div className="bg-orange-50 p-4 rounded-lg">
-                          <h4 className="font-medium text-gray-900 mb-1">Page Ranges</h4>
-                          <p className="text-sm text-gray-600">Extract specific page ranges</p>
+                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <div className="flex items-center gap-2 bg-orange-50 p-3 rounded-lg">
+                          <ListOrdered className="h-5 w-5 text-orange-600" />
+                          <span className="text-sm font-medium">Split by range</span>
                         </div>
-                        <div className="bg-orange-50 p-4 rounded-lg border-2 border-orange-200">
-                          <h4 className="font-medium text-gray-900 mb-1">Select Pages</h4>
-                          <p className="text-sm text-gray-600">Choose individual pages</p>
+                        <div className="flex items-center gap-2 bg-orange-50 p-3 rounded-lg">
+                          <ListChecks className="h-5 w-5 text-orange-600" />
+                          <span className="text-sm font-medium">Select specific pages</span>
                         </div>
-                        <div className="bg-orange-50 p-4 rounded-lg">
-                          <h4 className="font-medium text-gray-900 mb-1">Split All</h4>
-                          <p className="text-sm text-gray-600">One file per page</p>
+                        <div className="flex items-center gap-2 bg-orange-50 p-3 rounded-lg">
+                          <Zap className="h-5 w-5 text-orange-600" />
+                          <span className="text-sm font-medium">Split every page</span>
                         </div>
                       </div>
                     </div>
@@ -510,10 +462,10 @@ const SplitPdfPage = () => {
 
       {/* Help Section */}
       {!file && (
-        <Alert className="bg-orange-50 border-orange-200 max-w-3xl mx-auto">
-          <AlertCircle className="h-4 w-4 text-orange-600" />
-          <AlertDescription className="text-orange-700">
-            <strong>How to split a PDF:</strong> Upload a PDF file, choose your splitting method (page ranges, individual pages, or split all), then click "Split PDF" to create separate files.
+        <Alert className="bg-blue-50 border-blue-200 max-w-3xl mx-auto">
+          <AlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-700">
+            <strong>How to split a PDF:</strong> Upload a PDF file, choose a split method (by range, specific pages, or every page), then click "Split PDF" to create your split documents.
           </AlertDescription>
         </Alert>
       )}

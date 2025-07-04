@@ -104,6 +104,13 @@ const AudioTrimmerPage = () => {
     setStartTime(0);
     setEndTime(0);
     
+    // Create audio element to get duration
+    const audio = new Audio(url);
+    audio.onloadedmetadata = () => {
+      setDuration(audio.duration);
+      setEndTime(audio.duration);
+    };
+    
     // Initialize WaveSurfer
     if (waveformRef.current) {
       const wavesurfer = WaveSurfer.create({
@@ -116,6 +123,7 @@ const AudioTrimmerPage = () => {
         barRadius: 3,
         height: 100,
         normalize: true,
+        responsive: true
       });
       
       wavesurfer.load(url);
@@ -137,7 +145,7 @@ const AudioTrimmerPage = () => {
         }
       });
       
-      wavesurfer.on('click', () => {
+      wavesurfer.on('seek', () => {
         const currentTime = wavesurfer.getCurrentTime();
         setCurrentTime(currentTime);
         
