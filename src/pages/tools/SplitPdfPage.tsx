@@ -23,7 +23,7 @@ const SplitPdfPage = () => {
   const [file, setFile] = useState<File | null>(null);
   const [fileInfo, setFileInfo] = useState<{ size: string; pages: number } | null>(null);
   const [splitType, setSplitType] = useState("range");
-  const [pageRanges, setPageRanges] = useState("");
+  const [pageRanges, setPageRanges] = useState<string>("");
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -97,62 +97,32 @@ const SplitPdfPage = () => {
       return;
     }
 
-    if (splitType === "range" && !pageRanges.trim()) {
-      toast.error("Please enter page ranges");
-      return;
-    }
-
-    if (splitType === "pages" && selectedPages.length === 0) {
-      toast.error("Please select pages to extract");
+    if (!pageRanges.trim()) {
+      toast.error("Please enter page ranges to split");
       return;
     }
 
     setProcessing(true);
     setProgress(0);
-    setProgressMessage("Preparing to split PDF...");
+    setProgressMessage("Splitting PDF...");
 
     try {
-      const steps = [
-        { message: "Analyzing PDF structure...", progress: 20 },
-        { message: "Processing page ranges...", progress: 40 },
-        { message: "Creating split documents...", progress: 60 },
-        { message: "Finalizing files...", progress: 80 }
-      ];
-
-      for (const step of steps) {
-        setProgressMessage(step.message);
-        setProgress(step.progress);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
-      let ranges: { start: number; end: number; }[] = [];
-      
-      if (splitType === "range") {
-        ranges = parsePageRanges(pageRanges, fileInfo.pages);
-      } else if (splitType === "pages") {
-        ranges = selectedPages.map(page => ({ start: page, end: page }));
-      } else if (splitType === "every") {
-        for (let i = 1; i <= fileInfo.pages; i++) {
-          ranges.push({ start: i, end: i });
-        }
-      }
-
-      const results = await pdfProcessor.splitPdf(file, ranges);
+      const results = await pdfProcessor.splitPdf(file, pageRanges);
       
       const splitFiles = results.map((data, index) => ({
-        name: `split-${index + 1}-${file.name}`,
-        url: pdfProcessor.createDownloadLink(data, `split-${index + 1}-${file.name}`),
+        name: `${file.name.replace('.pdf', '')}_part_${index + 1}.pdf`,
+        url: pdfProcessor.createDownloadLink(data, `split_${index + 1}.pdf`),
         size: formatFileSize(data.length)
       }));
-      
+
       setSplitFiles(splitFiles);
       setProgress(100);
-      setProgressMessage("Split completed!");
-      toast.success(`PDF split into ${splitFiles.length} files!`);
+      setProgressMessage("PDF split successfully!");
+      toast.success("PDF split successfully!");
       
     } catch (error) {
       console.error('Split error:', error);
-      toast.error(error instanceof Error ? error.message : "Failed to split PDF. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to split PDF");
     } finally {
       setProcessing(false);
       setProgress(0);

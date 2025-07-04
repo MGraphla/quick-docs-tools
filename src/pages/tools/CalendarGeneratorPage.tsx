@@ -94,9 +94,9 @@ const CalendarGeneratorPage = () => {
     setIsGenerating(true);
     
     try {
-      // Create new PDF document
+      const orientation = layout === 'landscape' ? 'landscape' : 'portrait';
       const doc = new jsPDF({
-        orientation: layout,
+        orientation: orientation as 'portrait' | 'landscape',
         unit: 'mm',
         format: 'a4'
       });

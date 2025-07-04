@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
+import * as pdfjsLib from 'pdfjs-dist';
 
 interface ConvertedFile {
   name: string;

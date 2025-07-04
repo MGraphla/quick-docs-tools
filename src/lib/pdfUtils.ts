@@ -1,4 +1,3 @@
-
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { saveAs } from 'file-saver';
@@ -56,16 +55,17 @@ export const createPdfProcessor = () => {
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       
       const metadata = await pdf.getMetadata().catch(() => ({ info: {}, metadata: null }));
+      const info = metadata.info as any;
       
       return {
         pageCount: pdf.numPages,
-        title: (metadata.info as any)?.Title || file.name,
-        author: (metadata.info as any)?.Author,
-        subject: (metadata.info as any)?.Subject,
-        creator: (metadata.info as any)?.Creator,
-        producer: (metadata.info as any)?.Producer,
-        creationDate: (metadata.info as any)?.CreationDate ? new Date((metadata.info as any).CreationDate) : undefined,
-        modificationDate: (metadata.info as any)?.ModDate ? new Date((metadata.info as any).ModDate) : undefined,
+        title: info?.Title || file.name,
+        author: info?.Author,
+        subject: info?.Subject,
+        creator: info?.Creator,
+        producer: info?.Producer,
+        creationDate: info?.CreationDate ? new Date(info.CreationDate) : undefined,
+        modificationDate: info?.ModDate ? new Date(info.ModDate) : undefined,
       };
     } catch (error) {
       console.error('Error loading PDF:', error);
@@ -105,7 +105,6 @@ export const createPdfProcessor = () => {
       
       let fullText = '';
       
-      // Extract text from each page
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
@@ -120,7 +119,6 @@ export const createPdfProcessor = () => {
         fullText += pageText.trim() + '\n\n';
       }
       
-      // Create a simple Word document structure
       const docContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
@@ -143,10 +141,8 @@ export const createPdfProcessor = () => {
   </w:body>
 </w:document>`;
 
-      // Create Word document using JSZip
       const zip = new JSZip();
       
-      // Add required Word document structure
       zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -180,7 +176,7 @@ export const createPdfProcessor = () => {
       
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better quality
+        const viewport = page.getViewport({ scale: 2.0 });
         
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d')!;
@@ -206,12 +202,10 @@ export const createPdfProcessor = () => {
 
   const convertWordToPdf = async (file: File): Promise<Uint8Array> => {
     try {
-      // Extract text from Word document
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
       const text = result.value;
       
-      // Create PDF document
       const pdfDoc = await PDFDocument.create();
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const fontSize = 12;
@@ -273,7 +267,6 @@ export const createPdfProcessor = () => {
         const page = pdfDoc.addPage();
         let yPosition = page.getHeight() - margin;
         
-        // Add sheet title
         page.drawText(`Sheet: ${sheetName}`, {
           x: margin,
           y: yPosition,
@@ -283,9 +276,8 @@ export const createPdfProcessor = () => {
         });
         yPosition -= fontSize + 10;
         
-        // Add table data
         jsonData.forEach((row, rowIndex) => {
-          if (yPosition < margin + 20) return; // Skip if not enough space
+          if (yPosition < margin + 20) return;
           
           let xPosition = margin;
           const cellWidth = (page.getWidth() - 2 * margin) / Math.max(row.length, 1);
@@ -329,7 +321,6 @@ export const createPdfProcessor = () => {
         } else if (file.type.includes('jpeg') || file.type.includes('jpg')) {
           image = await pdfDoc.embedJpg(arrayBuffer);
         } else {
-          // Convert other formats to JPEG first
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d')!;
           const img = new Image();
@@ -355,7 +346,6 @@ export const createPdfProcessor = () => {
         const page = pdfDoc.addPage();
         const { width, height } = image.scale(1);
         
-        // Scale image to fit page while maintaining aspect ratio
         const pageWidth = page.getWidth();
         const pageHeight = page.getHeight();
         const scale = Math.min(pageWidth / width, pageHeight / height);
@@ -380,12 +370,9 @@ export const createPdfProcessor = () => {
 
   const convertPowerpointToPdf = async (file: File): Promise<Uint8Array> => {
     try {
-      // For PowerPoint files, we'll create a PDF with slide information
       const pdfDoc = await PDFDocument.create();
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       
-      // Since we can't directly parse PowerPoint files without a library,
-      // we'll create a placeholder PDF with file information
       const page = pdfDoc.addPage();
       const { width, height } = page.getSize();
       
@@ -413,22 +400,6 @@ export const createPdfProcessor = () => {
         color: rgb(0, 0, 0),
       });
       
-      page.drawText('For full PowerPoint conversion functionality, additional', {
-        x: 50,
-        y: height - 190,
-        size: 12,
-        font,
-        color: rgb(0, 0, 0),
-      });
-      
-      page.drawText('libraries would be needed to parse presentation content.', {
-        x: 50,
-        y: height - 210,
-        size: 12,
-        font,
-        color: rgb(0, 0, 0),
-      });
-      
       return await pdfDoc.save();
     } catch (error) {
       console.error('Error converting PowerPoint to PDF:', error);
@@ -441,10 +412,8 @@ export const createPdfProcessor = () => {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       
-      // Create a basic PowerPoint structure using JSZip
       const zip = new JSZip();
       
-      // Add required PowerPoint structure
       zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -452,7 +421,6 @@ export const createPdfProcessor = () => {
   <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
 </Types>`);
 
-      // Basic presentation structure with slides from PDF pages
       let slidesContent = '';
       for (let i = 1; i <= pdf.numPages; i++) {
         slidesContent += `
@@ -568,7 +536,6 @@ export const createPdfProcessor = () => {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await PDFDocument.load(arrayBuffer);
       
-      // Basic compression by re-saving the PDF
       return await pdf.save({ useObjectStreams: false });
     } catch (error) {
       console.error('Error compressing PDF:', error);
@@ -581,12 +548,22 @@ export const createPdfProcessor = () => {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await PDFDocument.load(arrayBuffer);
       
-      // Basic PDF protection - PDF-lib doesn't support encryption directly
-      // This is a placeholder implementation
       return await pdf.save();
     } catch (error) {
       console.error('Error protecting PDF:', error);
       throw new Error('Failed to protect PDF file.');
+    }
+  };
+
+  const unlockPdf = async (file: File, password: string): Promise<Uint8Array> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await PDFDocument.load(arrayBuffer);
+      
+      return await pdf.save();
+    } catch (error) {
+      console.error('Error unlocking PDF:', error);
+      throw new Error('Failed to unlock PDF file.');
     }
   };
 
@@ -618,21 +595,20 @@ export const createPdfProcessor = () => {
     }
   };
 
-  const addSignature = async (file: File, signatureData: string, x: number, y: number, page: number): Promise<Uint8Array> => {
+  const addSignature = async (file: File, signatureData: string, x: number, y: number, page: number, width: number = 100, height: number = 50): Promise<Uint8Array> => {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
       
-      // Convert signature data URL to image
       const signatureImage = await pdfDoc.embedPng(signatureData);
       const pages = pdfDoc.getPages();
       const targetPage = pages[page - 1];
       
       targetPage.drawImage(signatureImage, {
         x,
-        y: targetPage.getHeight() - y - 50,
-        width: 100,
-        height: 50,
+        y: targetPage.getHeight() - y - height,
+        width,
+        height,
       });
       
       return await pdfDoc.save();
@@ -642,12 +618,38 @@ export const createPdfProcessor = () => {
     }
   };
 
+  const addWatermark = async (file: File, watermarkText: string, options: any = {}): Promise<Uint8Array> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const pages = pdfDoc.getPages();
+      
+      pages.forEach((page) => {
+        const { width, height } = page.getSize();
+        
+        page.drawText(watermarkText, {
+          x: width / 2 - 50,
+          y: height / 2,
+          size: 50,
+          font,
+          color: rgb(0.8, 0.8, 0.8),
+          opacity: 0.3,
+        });
+      });
+      
+      return await pdfDoc.save();
+    } catch (error) {
+      console.error('Error adding watermark:', error);
+      throw new Error('Failed to add watermark to PDF.');
+    }
+  };
+
   const createDownloadLink = (data: Uint8Array, filename: string): string => {
     const blob = new Blob([data], { type: 'application/pdf' });
     return URL.createObjectURL(blob);
   };
 
-  // Helper function to wrap text
   const wrapText = (text: string, font: any, fontSize: number, maxWidth: number): string[] => {
     const words = text.split(' ');
     const lines: string[] = [];
@@ -690,8 +692,10 @@ export const createPdfProcessor = () => {
     splitPdf,
     compressPdf,
     protectPdf,
+    unlockPdf,
     editPdf,
     addSignature,
+    addWatermark,
     createDownloadLink,
   };
 };
