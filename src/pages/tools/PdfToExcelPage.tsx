@@ -118,129 +118,47 @@ const PdfToExcelPage = () => {
     setProgressMessage("Preparing conversion...");
     setConvertedFiles([]);
 
-    try {
-      const converted: ConvertedFile[] = [];
-      
-      const steps = [
-        { message: "Analyzing PDF content...", progress: 20 },
-        { message: "Detecting tables and data...", progress: 40 },
-        { message: "Extracting tabular data...", progress: 60 },
-        { message: "Converting to Excel format...", progress: 80 },
-        { message: "Optimizing spreadsheet...", progress: 95 }
-      ];
+    const converted: ConvertedFile[] = [];
 
-      for (const step of steps) {
-        setProgressMessage(step.message);
-        setProgress(step.progress);
-        await new Promise(resolve => setTimeout(resolve, 600));
-      }
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setProgress(((i + 1) / files.length) * 100);
-        setProgressMessage(`Converting ${file.file.name}...`);
+    for (let i = 0; i < files.length; i++) {
+        const fileData = files[i];
+        const progress = Math.round(((i + 1) / files.length) * 100);
+        setProgress(progress);
+        setProgressMessage(`[${i+1}/${files.length}] AI is analyzing ${fileData.file.name}...`);
         
         try {
-          // Extract text and tables from PDF
-          const arrayBuffer = await file.file.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-          
-          // Create a new workbook
-          const workbook = XLSX.utils.book_new();
-          
-          // Process each page
-          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-            const page = await pdf.getPage(pageNum);
-            const textContent = await page.getTextContent();
+            const excelBytes = await pdfProcessor.convertPdfToExcel(fileData.file);
             
-            // Extract text items with their positions
-            const textItems = textContent.items.map((item: any) => ({
-              text: item.str,
-              x: Math.round(item.transform[4]),
-              y: Math.round(item.transform[5]),
-              width: item.width,
-              height: item.height
-            }));
-            
-            // Group text items by y-position (rows)
-            const rows: { [key: number]: any[] } = {};
-            const yTolerance = 5; // Items within this y-distance are considered on the same row
-            
-            textItems.forEach(item => {
-              // Find a row that's close enough to this item's y-position
-              const existingY = Object.keys(rows).find(y => 
-                Math.abs(parseInt(y) - item.y) < yTolerance
-              );
-              
-              const rowY = existingY ? parseInt(existingY) : item.y;
-              if (!rows[rowY]) rows[rowY] = [];
-              rows[rowY].push(item);
+            const blob = new Blob([excelBytes], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
             });
-            
-            // Sort rows by y-position (top to bottom)
-            const sortedRows = Object.entries(rows)
-              .sort((a, b) => parseInt(b[0]) - parseInt(a[0])) // Reverse order because PDF y-coordinates start from bottom
-              .map(([_, items]) => 
-                // Sort items in each row by x-position (left to right)
-                items.sort((a, b) => a.x - b.x).map(item => item.text)
-              );
-            
-            // Create worksheet data
-            const wsData = sortedRows.map(row => {
-              // If row has only one cell and it's empty, return an empty array
-              if (row.length === 1 && row[0].trim() === '') return [];
-              return row;
-            }).filter(row => row.length > 0); // Remove empty rows
-            
-            // Create worksheet and add to workbook
-            if (wsData.length > 0) {
-              const ws = XLSX.utils.aoa_to_sheet(wsData);
-              XLSX.utils.book_append_sheet(workbook, ws, `Page ${pageNum}`);
-            }
-          }
-          
-          // Write workbook to array buffer
-          const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-          const excelBytes = new Uint8Array(wbout);
-          
-          // Create a blob URL for download
-          const blob = new Blob([excelBytes], { 
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-          });
-          const url = URL.createObjectURL(blob);
-          
-          // Simulate table detection
-          const tablesFound = Math.floor(Math.random() * 5) + 1;
-          
-          converted.push({
-            name: file.file.name.replace(/\.pdf$/i, '.xlsx'),
-            url,
-            size: formatFileSize(excelBytes.length),
-            bytes: excelBytes,
-            pages: file.info?.pageCount || 0,
-            tablesFound
-          });
+            const url = URL.createObjectURL(blob);
+
+            converted.push({
+                name: fileData.file.name.replace(/\.pdf$/i, '.xlsx'),
+                url,
+                size: formatFileSize(excelBytes.length),
+                bytes: excelBytes,
+                pages: fileData.info?.pageCount || 0,
+                tablesFound: 1, // Simplified, AI handles this
+            });
+            toast.success(`Successfully converted ${fileData.file.name}`);
+
         } catch (error) {
-          console.error(`Error converting ${file.file.name}:`, error);
-          toast.error(`Failed to convert ${file.file.name}. Please try again.`);
+            console.error(`Error converting ${fileData.file.name}:`, error);
+            toast.error(`AI failed to convert ${fileData.file.name}. It might be a complex document.`);
         }
-      }
-      
-      if (converted.length > 0) {
+    }
+
+    if (converted.length > 0) {
         setConvertedFiles(converted);
         setProgress(100);
-        setProgressMessage("Conversion completed!");
-        toast.success(`Successfully converted ${files.length} PDF file${files.length > 1 ? 's' : ''} to Excel format`);
-      }
-      
-    } catch (error) {
-      console.error('Conversion error:', error);
-      toast.error(error instanceof Error ? error.message : "Conversion failed. Please try again.");
-    } finally {
-      setConverting(false);
-      setProgress(0);
-      setProgressMessage("");
+        setProgressMessage("Conversion complete!");
+    } else {
+        setProgressMessage("Conversion failed.");
     }
+    
+    setConverting(false);
   };
 
   const downloadFile = (file: ConvertedFile) => {
@@ -289,7 +207,7 @@ const PdfToExcelPage = () => {
         </div>
         <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">PDF to Excel</h1>
         <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
-          Extract tables and data from PDF documents into Excel-compatible format with intelligent table detection.
+          Our AI analyzes your PDF to extract tables, lists, and pricing data, then converts it into a structured Excel spreadsheet.
         </p>
       </div>
 

@@ -202,22 +202,22 @@ const MergePdfPage = () => {
   const totalPages = files.reduce((sum, file) => sum + (file.info?.pageCount || 0), 0);
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-6 md:space-y-8 max-w-6xl mx-auto p-4">
       {/* Header */}
       <div className="text-center">
         <div className="inline-flex items-center bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
           <FileText className="h-4 w-4 mr-2" />
           PDF Merge Tool
         </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Merge PDF Files</h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Merge PDF Files</h1>
+        <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
           Combine multiple PDF documents into one seamless file. Drag to reorder, preview pages, and create professional merged documents.
         </p>
       </div>
 
       {/* Upload Area */}
       <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-all duration-300">
-        <CardContent className="p-8">
+        <CardContent className="p-6 sm:p-8">
           <div
             className={`text-center transition-all duration-300 cursor-pointer ${
               dragOver ? 'scale-105 bg-blue-50' : ''
@@ -232,10 +232,10 @@ const MergePdfPage = () => {
                 <Upload className="h-10 w-10 text-white" />
               </div>
             </div>
-            <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+            <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
               Drop PDF files here or click to browse
             </h3>
-            <p className="text-gray-600 mb-6 text-lg">
+            <p className="text-gray-600 mb-6">
               Select multiple PDF files to merge into one document
             </p>
             <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
@@ -258,7 +258,7 @@ const MergePdfPage = () => {
       {files.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
@@ -284,9 +284,9 @@ const MergePdfPage = () => {
               {files.map((file, index) => (
                 <div
                   key={file.id}
-                  className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                  className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  <div className="flex items-center gap-3 flex-1">
+                  <div className="flex items-center gap-3 w-full">
                     <div className="flex flex-col gap-1">
                       <Button
                         variant="ghost"
@@ -317,11 +317,11 @@ const MergePdfPage = () => {
                         <Badge variant="secondary" className="text-xs">
                           #{index + 1}
                         </Badge>
-                        <h4 className="font-medium text-gray-900 truncate">
+                        <h4 className="font-medium text-gray-900 break-all sm:break-words sm:truncate">
                           {file.file.name}
                         </h4>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
                         <span>{file.info?.pageCount || 0} pages</span>
                         <span>{file.size}</span>
                         <span>{new Date(file.file.lastModified).toLocaleDateString()}</span>
@@ -329,7 +329,7 @@ const MergePdfPage = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-2 self-end sm:self-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <Button variant="ghost" size="sm">
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -377,7 +377,7 @@ const MergePdfPage = () => {
       {mergedFileUrl && mergedFileName && (
         <Card className="border-green-200 bg-green-50">
           <CardContent className="p-6">
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
               <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full">
                 <CheckCircle className="h-6 w-6 text-green-600" />
               </div>
@@ -392,7 +392,7 @@ const MergePdfPage = () => {
               </div>
               <Button
                 onClick={downloadMerged}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-green-600 hover:bg-green-700 text-white w-full md:w-auto"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download Merged PDF

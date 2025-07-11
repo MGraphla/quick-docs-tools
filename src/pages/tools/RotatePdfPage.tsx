@@ -10,7 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
+import { formatFileSize } from "@/lib/pdfUtils";
+import { PDFDocument, degrees } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.mjs`;
 
 interface RotatedFile {
   name: string;
@@ -36,7 +40,26 @@ const RotatePdfPage = () => {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
-  const pdfProcessor = createPdfProcessor();
+  const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
+
+  const renderPage = useCallback(async (pageNum: number) => {
+    if (!pdfDocRef.current || !pdfCanvasRef.current) return;
+    try {
+      const page = await pdfDocRef.current.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = pdfCanvasRef.current;
+      const context = canvas.getContext('2d');
+      if (!context) return;
+
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      await page.render({ canvasContext: context, viewport }).promise;
+    } catch (error) {
+      console.error(`Error rendering page ${pageNum}:`, error);
+      toast.error(`Failed to render page ${pageNum}.`);
+    }
+  }, []);
 
   const handleFileSelect = useCallback(async (selectedFiles: FileList | null) => {
     if (!selectedFiles || selectedFiles.length === 0) return;
@@ -48,18 +71,23 @@ const RotatePdfPage = () => {
     }
 
     const loadingToast = toast.loading("Loading PDF...");
-    
+
     try {
-      const info = await pdfProcessor.loadPdf(selectedFile);
+      const arrayBuffer = await selectedFile.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      pdfDocRef.current = pdf;
+
       setFile(selectedFile);
       setFileInfo({
         size: formatFileSize(selectedFile.size),
-        pages: info.pageCount
+        pages: pdf.numPages
       });
       setRotatedFile(null);
       setCurrentPage(1);
       setSelectedPages([]);
-      toast.success(`PDF loaded: ${info.pageCount} pages`);
+      toast.success(`PDF loaded: ${pdf.numPages} pages`);
+
+      await renderPage(1);
     } catch (error) {
       console.error('Error loading PDF:', error);
       toast.error(error instanceof Error ? error.message : "Failed to load PDF");
@@ -158,36 +186,34 @@ const RotatePdfPage = () => {
     setProgressMessage("Preparing to rotate pages...");
 
     try {
-      const steps = [
-        { message: "Analyzing PDF structure...", progress: 15 },
-        { message: "Processing page content...", progress: 30 },
-        { message: "Rotating selected pages...", progress: 50 },
-        { message: "Optimizing document...", progress: 70 },
-        { message: "Finalizing rotated PDF...", progress: 90 }
-      ];
+      setProgressMessage("Loading original PDF...");
+      const existingPdfBytes = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(existingPdfBytes);
+      setProgress(25);
 
-      for (const step of steps) {
-        setProgressMessage(step.message);
-        setProgress(step.progress);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+      setProgressMessage("Rotating selected pages...");
+      const angle = rotationDirection === 'clockwise' ? rotationAngle : -rotationAngle;
+      pagesToRotate.forEach(pageNum => {
+        const page = pdfDoc.getPage(pageNum - 1);
+        const currentRotation = page.getRotation().angle;
+        page.setRotation(degrees(currentRotation + angle));
+      });
+      setProgress(75);
 
-      // Simulate PDF creation
-      const rotationText = rotationDirection === 'clockwise' ? 'CW' : 'CCW';
-      const pdfContent = `Rotated version of ${file.name} - ${rotationAngle}° ${rotationText}`;
-      const blob = new Blob([pdfContent], { type: 'application/pdf' });
+      setProgressMessage("Saving new PDF...");
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
-      
+
       setRotatedFile({
-        name: `rotated-${rotationAngle}deg-${file.name}`,
+        name: `rotated-${file.name}`,
         url,
         size: formatFileSize(blob.size)
       });
-      
+
       setProgress(100);
-      setProgressMessage("Rotation completed!");
-      toast.success(`Successfully rotated ${pagesToRotate.length} page${pagesToRotate.length > 1 ? 's' : ''} by ${rotationAngle}° ${rotationDirection === 'clockwise' ? 'clockwise' : 'counterclockwise'}`);
-      
+      setProgressMessage("Rotation complete!");
+      toast.success(`Successfully rotated ${pagesToRotate.length} page(s).`);
     } catch (error) {
       console.error('Rotation error:', error);
       toast.error(error instanceof Error ? error.message : "Failed to rotate PDF. Please try again.");
@@ -212,6 +238,7 @@ const RotatePdfPage = () => {
     if (!fileInfo) return;
     if (newPage < 1 || newPage > fileInfo.pages) return;
     setCurrentPage(newPage);
+    renderPage(newPage);
   };
 
   return (
@@ -450,12 +477,10 @@ const RotatePdfPage = () => {
               </CardHeader>
               <CardContent>
                 <div className="bg-gray-100 p-4 rounded-lg flex items-center justify-center min-h-[600px]">
-                  <div className="bg-white shadow-lg rounded-lg overflow-hidden relative" style={{ width: '595px', height: '842px' }}>
+                  <div className="bg-white shadow-lg rounded-lg overflow-hidden relative">
                     <canvas 
                       ref={pdfCanvasRef}
-                      width={595}
-                      height={842}
-                      className="w-full h-full border"
+                      className="border"
                     />
                     
                     {/* Page Selection Overlay */}

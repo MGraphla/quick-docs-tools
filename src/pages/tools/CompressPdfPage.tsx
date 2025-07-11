@@ -115,7 +115,7 @@ const CompressPdfPage = () => {
         compressionLevel
       };
 
-      const compressedData = await pdfProcessor.compressPdf(file);
+      const compressedData = await pdfProcessor.compressPdf(file, compressionSettings);
       
       setCompressedFile({
         name: `compressed-${file.name}`,

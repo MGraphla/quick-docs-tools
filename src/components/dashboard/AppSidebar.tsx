@@ -53,7 +53,7 @@ const pdfTools = [
   { name: "PowerPoint to PDF", path: "/dashboard/powerpoint-to-pdf", icon: FileUp },
   { name: "Excel to PDF", path: "/dashboard/excel-to-pdf", icon: FileUp },
   { name: "JPG to PDF", path: "/dashboard/jpg-to-pdf", icon: FileUp },
-  { name: "Edit PDF", path: "/dashboard/edit-pdf", icon: Edit },
+  // { name: "Edit PDF", path: "/dashboard/edit-pdf", icon: Edit },
   { name: "Sign PDF", path: "/dashboard/sign-pdf", icon: Signature },
   { name: "Watermark", path: "/dashboard/watermark-pdf", icon: Shield },
   { name: "Rotate PDF", path: "/dashboard/rotate-pdf", icon: Settings },

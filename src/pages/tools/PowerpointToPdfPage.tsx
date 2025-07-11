@@ -12,7 +12,8 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
 import { saveAs } from 'file-saver';
-import JSZip from 'jszip';
+import jsPDF from 'jspdf';
+
 
 interface ConvertedFile {
   name: string;
@@ -125,85 +126,63 @@ const PowerpointToPdfPage = () => {
         setProgressMessage(`Converting ${file.file.name}...`);
         
         try {
-          // Extract images or create placeholders for slides
-          const slideImages = await extractImagesFromPowerPoint(file.file);
-          
-          // Create PDF document
-          const doc = new jsPDF({
-            orientation: orientation === "landscape" ? "landscape" : "portrait",
-            unit: "pt",
-            format: 'a4'
-          });
-          
+          // --- High-Fidelity Conversion using ConvertAPI ---
+          const apiKey = 'YbRmK3oiAlJm7hJ2YyDqdfBcJJ5rhWiL';
+
+          const formData = new FormData();
+          formData.append('file', file.file);
+
+          const response = await fetch(`https://v2.convertapi.com/convert/pptx/to/png?Secret=${apiKey}`,
+            {
+              method: 'POST',
+              body: formData,
+            }
+          );
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`API Error: ${errorData.error} - ${errorData.message}`);
+          }
+
+          const result = await response.json();
+          const slideImages = result.Files.map((f: any) => `data:${f.FileExt};base64,${f.FileData}`);
+
+          const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
           const pageWidth = doc.internal.pageSize.getWidth();
           const pageHeight = doc.internal.pageSize.getHeight();
-          
-          // Add each slide as a page in the PDF
-          for (let slideIndex = 0; slideIndex < slideImages.length; slideIndex++) {
-            if (slideIndex > 0) {
-              doc.addPage();
+
+          for (let i = 0; i < slideImages.length; i++) {
+            if (i > 0) {
+              doc.addPage('a4', 'landscape');
             }
-            
-            if (slideImages[slideIndex] === 'placeholder') {
-              // Create a placeholder slide with text
-              doc.setFillColor(240, 240, 240);
-              doc.rect(0, 0, pageWidth, pageHeight, 'F');
-              
-              doc.setFontSize(24);
-              doc.setTextColor(100, 100, 100);
-              doc.text(`Slide ${slideIndex + 1}`, pageWidth / 2, pageHeight / 2, { align: 'center' });
-              
-              doc.setFontSize(14);
-              doc.text(`From: ${file.file.name}`, pageWidth / 2, pageHeight / 2 + 30, { align: 'center' });
-            } else {
-              // Add the slide image
-              try {
-                doc.addImage(
-                  slideImages[slideIndex], 
-                  'JPEG', 
-                  0, 
-                  0, 
-                  pageWidth, 
-                  pageHeight, 
-                  `slide_${slideIndex}`, 
-                  'FAST'
-                );
-              } catch (error) {
-                console.error(`Error adding slide ${slideIndex} image:`, error);
-                
-                // Fallback to placeholder on error
-                doc.setFillColor(240, 240, 240);
-                doc.rect(0, 0, pageWidth, pageHeight, 'F');
-                
-                doc.setFontSize(24);
-                doc.setTextColor(100, 100, 100);
-                doc.text(`Slide ${slideIndex + 1} (Error)`, pageWidth / 2, pageHeight / 2, { align: 'center' });
-              }
+
+            const margin = 20;
+            const availableWidth = pageWidth - (margin * 2);
+            const availableHeight = pageHeight - (margin * 2);
+            const imageAspectRatio = 16 / 9; // Assuming 16:9, adjust if needed
+            let slideWidth = availableWidth;
+            let slideHeight = slideWidth / imageAspectRatio;
+
+            if (slideHeight > availableHeight) {
+              slideHeight = availableHeight;
+              slideWidth = slideHeight * imageAspectRatio;
             }
-            
-            // Add slide number
-            doc.setFontSize(10);
-            doc.setTextColor(150, 150, 150);
-            doc.text(`${slideIndex + 1} / ${slideImages.length}`, pageWidth - 50, pageHeight - 20);
+
+            const x = (pageWidth - slideWidth) / 2;
+            const y = (pageHeight - slideHeight) / 2;
+
+            doc.addImage(slideImages[i], 'PNG', x, y, slideWidth, slideHeight);
           }
-          
-          // Save the PDF
+
           const pdfBlob = doc.output('blob');
           const url = URL.createObjectURL(pdfBlob);
-          
+
           converted.push({
             name: file.file.name.replace(/\.(pptx?|ppt)$/i, '.pdf'),
             url,
             size: formatFileSize(pdfBlob.size),
             originalSize: file.file.size,
-            pages: slideImages.length
-          });
-          
-          // Clean up image URLs
-          slideImages.forEach(url => {
-            if (url !== 'placeholder') {
-              URL.revokeObjectURL(url);
-            }
+            pages: doc.internal.getNumberOfPages(),
           });
           
         } catch (error) {
@@ -230,54 +209,7 @@ const PowerpointToPdfPage = () => {
   };
 
   // Function to extract images from PowerPoint files
-  const extractImagesFromPowerPoint = async (file: File): Promise<string[]> => {
-    try {
-      // Read the file as an array buffer
-      const arrayBuffer = await file.arrayBuffer();
-      
-      // Use JSZip to extract contents (works for .pptx which is a zip file)
-      const zip = new JSZip();
-      const contents = await zip.loadAsync(arrayBuffer);
-      
-      // Find slide images in the pptx structure
-      const slideImages: string[] = [];
-      const imageFiles: string[] = [];
-      
-      // First try to find slide images
-      for (const path in contents.files) {
-        if (path.startsWith('ppt/media/') && 
-            (path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg'))) {
-          imageFiles.push(path);
-        }
-      }
-      
-      // If we found images, extract them
-      for (const imagePath of imageFiles) {
-        const imageBlob = await contents.files[imagePath].async('blob');
-        const imageUrl = URL.createObjectURL(imageBlob);
-        slideImages.push(imageUrl);
-      }
-      
-      // If no images found, create placeholder slides based on slide count
-      if (slideImages.length === 0) {
-        // Look for slide files to count them
-        const slideCount = Object.keys(contents.files)
-          .filter(path => path.startsWith('ppt/slides/slide') && path.endsWith('.xml'))
-          .length;
-        
-        // Create placeholder slides
-        for (let i = 0; i < (slideCount || 5); i++) {
-          slideImages.push('placeholder');
-        }
-      }
-      
-      return slideImages;
-    } catch (error) {
-      console.error('Error extracting images from PowerPoint:', error);
-      // Return at least one placeholder for error cases
-      return ['placeholder'];
-    }
-  };
+
 
   const downloadFile = (file: ConvertedFile) => {
     const link = document.createElement('a');

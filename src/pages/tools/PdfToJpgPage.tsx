@@ -10,9 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
+import { createPdfProcessor, formatFileSize } from '@/lib/pdfUtils';
 
 interface FileWithId {
   id: string;

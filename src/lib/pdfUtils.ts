@@ -1,1171 +1,919 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import { PDFDocument, rgb, StandardFonts, degrees, PDFFont, PDFPage } from 'pdf-lib';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+import { PDFDocument, StandardFonts, degrees, rgb, PDFImage, PDFFont, RGB } from 'pdf-lib';
 import mammoth from 'mammoth';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import html2pdf from 'html2pdf.js';
+import PptxGenJS from 'pptxgenjs';
+import axios from 'axios';
+import { Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, WidthType, HeadingLevel } from 'docx';
+import ExcelJS from 'exceljs';
 
-// Set up PDF.js worker using the correct approach for Vite
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).toString();
 
-export interface PdfInfo {
-  pageCount: number;
-  title?: string;
-  author?: string;
-  subject?: string;
-  keywords?: string;
-  creator?: string;
-  producer?: string;
-  creationDate?: Date;
-  modificationDate?: Date;
-  isEncrypted?: boolean;
-}
+const hexToRgb = (hex: string) => {
+  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
 
-export interface PageRange {
-  start: number;
-  end: number;
-}
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? {
+        red: parseInt(result[1], 16) / 255,
+        green: parseInt(result[2], 16) / 255,
+        blue: parseInt(result[3], 16) / 255,
+      }
+    : { red: 0, green: 0, blue: 0 }; // Default to black
+};
 
-export function formatFileSize(bytes: number): string {
+export const formatFileSize = (bytes: number, decimals = 2) => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
 
-export function parsePageRanges(ranges: string, totalPages: number): PageRange[] {
-  const pageRanges: PageRange[] = [];
-  const parts = ranges.split(',').map(part => part.trim());
-  
+export function parsePageRanges(rangeStr: string): number[] {
+  const pages: number[] = [];
+  if (!rangeStr) return pages;
+
+  const parts = rangeStr.split(',');
   for (const part of parts) {
-    if (part.includes('-')) {
-      const [start, end] = part.split('-').map(num => parseInt(num.trim()));
-      if (start && end && start <= totalPages && end <= totalPages && start <= end) {
-        pageRanges.push({ start, end });
+    const trimmedPart = part.trim();
+    if (trimmedPart.includes('-')) {
+      const [start, end] = trimmedPart.split('-').map(num => parseInt(num, 10));
+      if (!isNaN(start) && !isNaN(end) && start <= end) {
+        for (let i = start; i <= end; i++) {
+          pages.push(i);
+        }
       }
     } else {
-      const pageNum = parseInt(part);
-      if (pageNum && pageNum <= totalPages) {
-        pageRanges.push({ start: pageNum, end: pageNum });
+      const page = parseInt(trimmedPart, 10);
+      if (!isNaN(page)) {
+        pages.push(page);
       }
     }
   }
-  
-  return pageRanges;
+  return [...new Set(pages)].sort((a, b) => a - b);
 }
 
-export function createPdfProcessor() {
-  return {
-    async loadPdf(file: File, password?: string): Promise<PdfInfo> {
-      const arrayBuffer = await file.arrayBuffer();
-      
-      try {
-        const pdf = await pdfjsLib.getDocument({ 
-          data: arrayBuffer,
-          password: password || undefined
-        }).promise;
-        
-        const metadata = await pdf.getMetadata();
-        const info = metadata.info as any;
-        
-        return {
-          pageCount: pdf.numPages,
-          title: info?.Title,
-          author: info?.Author,
-          subject: info?.Subject,
-          keywords: info?.Keywords,
-          creator: info?.Creator,
-          producer: info?.Producer,
-          creationDate: info?.CreationDate,
-          modificationDate: info?.ModDate,
-          isEncrypted: false
-        };
-      } catch (error: any) {
-        if (error.name === 'PasswordException' || error.message?.includes('password')) {
-          throw new Error('This PDF is password protected. Please provide the correct password.');
+interface PdfInfo {
+  pageCount: number;
+}
+
+export class PdfProcessor {
+  async loadPdf(file: File): Promise<PdfInfo> {
+    const fileReader = new FileReader();
+    return new Promise((resolve, reject) => {
+      fileReader.onload = async (event) => {
+        if (!event.target?.result) {
+          return reject(new Error('Failed to read file.'));
         }
-        throw error;
-      }
-    },
-
-    async renderPdfPage(file: File, pageNumber: number, scale: number = 1.5, password?: string): Promise<string> {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ 
-        data: arrayBuffer,
-        password: password || undefined
-      }).promise;
-      
-      const page = await pdf.getPage(pageNumber);
-      const viewport = page.getViewport({ scale });
-      
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d')!;
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-
-      await page.render({
-        canvasContext: context,
-        viewport: viewport
-      }).promise;
-
-      return canvas.toDataURL('image/jpeg', 0.95);
-    },
-
-    async protectPdf(file: File, password: string, permissions: any = {}): Promise<Uint8Array> {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
-      
-      // Simple password protection using PDF-lib's built-in encryption
-      // Note: PDF-lib doesn't support full encryption, so we'll create a basic protection mechanism
-      
-      // Add password metadata to the document
-      pdfDoc.setTitle(`Protected: ${file.name}`);
-      pdfDoc.setSubject('This document is password protected');
-      pdfDoc.setKeywords(['password-protected']);
-      pdfDoc.setProducer(`Protected with password`);
-      pdfDoc.setCreator(`Password: ${btoa(password)}`); // Base64 encode for basic obfuscation
-      
-      // Add a protection page at the beginning
-      const protectionPage = pdfDoc.insertPage(0, [612, 792]);
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      
-      protectionPage.drawText('PASSWORD PROTECTED DOCUMENT', {
-        x: 50,
-        y: 700,
-        size: 20,
-        font,
-        color: rgb(0.8, 0, 0)
-      });
-      
-      protectionPage.drawText('This PDF is password protected.', {
-        x: 50,
-        y: 650,
-        size: 14,
-        font,
-        color: rgb(0, 0, 0)
-      });
-      
-      protectionPage.drawText('Password verification is required to access the content.', {
-        x: 50,
-        y: 620,
-        size: 12,
-        font,
-        color: rgb(0.3, 0.3, 0.3)
-      });
-      
-      protectionPage.drawText(`Original filename: ${file.name}`, {
-        x: 50,
-        y: 580,
-        size: 10,
-        font,
-        color: rgb(0.5, 0.5, 0.5)
-      });
-      
-      protectionPage.drawText(`Protected on: ${new Date().toLocaleDateString()}`, {
-        x: 50,
-        y: 560,
-        size: 10,
-        font,
-        color: rgb(0.5, 0.5, 0.5)
-      });
-      
-      // Add permissions info if provided
-      if (Object.keys(permissions).length > 0) {
-        protectionPage.drawText('Permissions:', {
-          x: 50,
-          y: 520,
-          size: 12,
-          font,
-          color: rgb(0, 0, 0)
-        });
-        
-        let yPos = 500;
-        Object.entries(permissions).forEach(([key, value]) => {
-          protectionPage.drawText(`• ${key}: ${value ? 'Allowed' : 'Denied'}`, {
-            x: 70,
-            y: yPos,
-            size: 10,
-            font,
-            color: rgb(0.3, 0.3, 0.3)
-          });
-          yPos -= 20;
-        });
-      }
-      
-      return await pdfDoc.save();
-    },
-
-    async unlockPdf(file: File, password: string): Promise<Uint8Array> {
-      const arrayBuffer = await file.arrayBuffer();
-      
-      try {
-        // First try to load with standard PDF password
         try {
-          const pdf = await pdfjsLib.getDocument({ 
-            data: arrayBuffer,
-            password: password
-          }).promise;
-          
-          // If successful, create unlocked version
-          const pdfDoc = await PDFDocument.load(arrayBuffer, { 
-            ignoreEncryption: true,
-            password 
-          });
-          
-          // Create unlocked version
-          const unlockedPdf = await PDFDocument.create();
-          const pages = await unlockedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
-          
-          pages.forEach((page) => unlockedPdf.addPage(page));
-          
-          // Remove protection metadata
-          unlockedPdf.setTitle(file.name.replace('protected-', ''));
-          unlockedPdf.setSubject('Unlocked document');
-          unlockedPdf.setCreator('Unlocked PDF');
-          
-          return await unlockedPdf.save();
+          const typedarray = new Uint8Array(event.target.result as ArrayBuffer);
+          const pdf = await pdfjsLib.getDocument(typedarray).promise;
+          resolve({ pageCount: pdf.numPages });
         } catch (error) {
-          // If standard PDF password fails, try our basic protection method
-          const pdfDoc = await PDFDocument.load(arrayBuffer);
-          
-          // Check if this is our basic protection
-          const creator = pdfDoc.getCreator();
-          if (creator && creator.startsWith('Password: ')) {
-            // Extract and verify password
-            const storedPassword = atob(creator.replace('Password: ', ''));
-            
-            if (storedPassword !== password) {
-              throw new Error('Invalid password');
-            }
-            
-            // Remove the protection page (first page)
-            const pages = pdfDoc.getPages();
-            if (pages.length > 1) {
-              pdfDoc.removePage(0);
-            }
-            
-            // Clean up metadata
-            pdfDoc.setTitle(file.name.replace('Protected: ', ''));
-            pdfDoc.setSubject('Unlocked document');
-            pdfDoc.setKeywords([]);
-            pdfDoc.setProducer('Unlocked PDF');
-            pdfDoc.setCreator('Unlocked PDF');
-            
-            return await pdfDoc.save();
-          } else {
-            throw new Error('Invalid password or unsupported encryption method');
-          }
+          console.error('Error loading PDF:', error);
+          reject(error);
         }
-      } catch (error: any) {
-        if (error.name === 'PasswordException' || error.message?.includes('password')) {
-          throw new Error('Invalid password. Please check your password and try again.');
+      };
+      fileReader.onerror = (error) => {
+        console.error('FileReader error:', error);
+        reject(error);
+      };
+      fileReader.readAsArrayBuffer(file);
+    });
+  }
+
+  async renderPdfPage(file: File, pageNum: number, scale: number): Promise<string> {
+    const fileReader = new FileReader();
+    return new Promise((resolve, reject) => {
+      fileReader.onload = async (event) => {
+        if (!event.target?.result) {
+          return reject(new Error('Failed to read file.'));
         }
-        throw new Error('Failed to unlock PDF. The file may be corrupted or use unsupported encryption.');
-      }
-    },
-
-    async editPdf(file: File, edits: Array<{
-      type: 'text' | 'highlight' | 'shape' | 'image';
-      page: number;
-      x: number;
-      y: number;
-      content?: string;
-      fontSize?: number;
-      color?: string;
-      width?: number;
-      height?: number;
-      shapeType?: 'rectangle' | 'circle';
-      imageData?: string;
-    }>): Promise<Uint8Array> {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
-      const pages = pdfDoc.getPages();
-      
-      for (const edit of edits) {
-        const page = pages[edit.page - 1];
-        if (!page) continue;
-        
-        const { width: pageWidth, height: pageHeight } = page.getSize();
-        
-        switch (edit.type) {
-          case 'text':
-            if (edit.content) {
-              const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-              page.drawText(edit.content, {
-                x: edit.x,
-                y: pageHeight - edit.y, // Convert from top-based to bottom-based coordinates
-                size: edit.fontSize || 12,
-                font,
-                color: edit.color ? rgb(
-                  parseInt(edit.color.slice(1, 3), 16) / 255,
-                  parseInt(edit.color.slice(3, 5), 16) / 255,
-                  parseInt(edit.color.slice(5, 7), 16) / 255
-                ) : rgb(0, 0, 0)
-              });
-            }
-            break;
-            
-          case 'highlight':
-            page.drawRectangle({
-              x: edit.x,
-              y: pageHeight - edit.y - (edit.height || 20),
-              width: edit.width || 100,
-              height: edit.height || 20,
-              color: edit.color ? rgb(
-                parseInt(edit.color.slice(1, 3), 16) / 255,
-                parseInt(edit.color.slice(3, 5), 16) / 255,
-                parseInt(edit.color.slice(5, 7), 16) / 255
-              ) : rgb(1, 1, 0),
-              opacity: 0.3
-            });
-            break;
-            
-          case 'shape':
-            if (edit.shapeType === 'rectangle') {
-              page.drawRectangle({
-                x: edit.x,
-                y: pageHeight - edit.y - (edit.height || 50),
-                width: edit.width || 100,
-                height: edit.height || 50,
-                borderColor: edit.color ? rgb(
-                  parseInt(edit.color.slice(1, 3), 16) / 255,
-                  parseInt(edit.color.slice(3, 5), 16) / 255,
-                  parseInt(edit.color.slice(5, 7), 16) / 255
-                ) : rgb(0, 0, 1),
-                borderWidth: 2
-              });
-            } else if (edit.shapeType === 'circle') {
-              page.drawCircle({
-                x: edit.x + (edit.width || 50) / 2,
-                y: pageHeight - edit.y - (edit.height || 50) / 2,
-                size: (edit.width || 50) / 2,
-                borderColor: edit.color ? rgb(
-                  parseInt(edit.color.slice(1, 3), 16) / 255,
-                  parseInt(edit.color.slice(3, 5), 16) / 255,
-                  parseInt(edit.color.slice(5, 7), 16) / 255
-                ) : rgb(0, 0, 1),
-                borderWidth: 2
-              });
-            }
-            break;
-            
-          case 'image':
-            if (edit.imageData) {
-              try {
-                const imageBytes = Uint8Array.from(atob(edit.imageData.split(',')[1]), c => c.charCodeAt(0));
-                let embeddedImage;
-                
-                if (edit.imageData.includes('data:image/png')) {
-                  embeddedImage = await pdfDoc.embedPng(imageBytes);
-                } else {
-                  embeddedImage = await pdfDoc.embedJpg(imageBytes);
-                }
-                
-                page.drawImage(embeddedImage, {
-                  x: edit.x,
-                  y: pageHeight - edit.y - (edit.height || 100),
-                  width: edit.width || 100,
-                  height: edit.height || 100
-                });
-              } catch (error) {
-                console.error('Error embedding image:', error);
-              }
-            }
-            break;
-        }
-      }
-      
-      return await pdfDoc.save();
-    },
-
-    async convertPdfToImages(file: File, quality: number = 2): Promise<string[]> {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const images: string[] = [];
-
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale: quality });
-        
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d')!;
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-
-        await page.render({
-          canvasContext: context,
-          viewport: viewport
-        }).promise;
-
-        images.push(canvas.toDataURL('image/jpeg', 0.95));
-      }
-
-      return images;
-    },
-
-    async convertPdfToWord(file: File): Promise<Uint8Array> {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      
-      let fullText = '';
-      
-      // Extract text from each page
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' ');
-        
-        fullText += pageText + '\n\n';
-      }
-
-      // Create a basic DOCX structure using JSZip
-      const zip = new JSZip();
-      
-      // Add basic DOCX structure
-      zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-wordprocessingml.document.main+xml"/>
-  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-wordprocessingml.styles+xml"/>
-  <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-wordprocessingml.settings+xml"/>
-  <Override PartName="/word/webSettings.xml" ContentType="application/vnd.openxmlformats-wordprocessingml.webSettings+xml"/>
-  <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-wordprocessingml.fontTable+xml"/>
-  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
-</Types>`);
-
-      zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
-</Relationships>`);
-
-      zip.file('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings" Target="webSettings.xml"/>
-  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
-</Relationships>`);
-
-      // Add required Word document files
-      zip.file('word/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
-    <w:name w:val="Normal"/>
-    <w:qFormat/>
-    <w:pPr>
-      <w:spacing w:after="0" w:line="240" w:lineRule="auto"/>
-    </w:pPr>
-    <w:rPr>
-      <w:sz w:val="24"/>
-      <w:szCs w:val="24"/>
-      <w:lang w:val="en-US" w:eastAsia="en-US" w:bidi="ar-SA"/>
-    </w:rPr>
-  </w:style>
-</w:styles>`);
-
-      zip.file('word/settings.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:defaultTabStop w:val="720"/>
-  <w:characterSpacingControl w:val="doNotCompress"/>
-</w:settings>`);
-
-      zip.file('word/webSettings.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:optimizeForBrowser/>
-  <w:allowPNG/>
-</w:webSettings>`);
-
-      zip.file('word/fontTable.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:font w:name="Calibri">
-    <w:panose1 w:val="020F0502020204030204"/>
-    <w:charset w:val="00"/>
-    <w:family w:val="swiss"/>
-    <w:pitch w:val="variable"/>
-    <w:sig w:usb0="E4002EFF" w:usb1="C000247B" w:usb2="00000009" w:usb3="00000000" w:csb0="000001FF" w:csb1="00000000"/>
-  </w:font>
-</w:fonts>`);
-
-      zip.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" 
-                  xmlns:dc="http://purl.org/dc/elements/1.1/" 
-                  xmlns:dcterms="http://purl.org/dc/terms/" 
-                  xmlns:dcmitype="http://purl.org/dc/dcmitype/" 
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>PDF to Word Conversion</dc:title>
-  <dc:creator>QuickDocs</dc:creator>
-  <cp:lastModifiedBy>QuickDocs</cp:lastModifiedBy>
-  <cp:revision>1</cp:revision>
-  <dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created>
-  <dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified>
-</cp:coreProperties>`);
-
-      zip.file('docProps/app.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" 
-           xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>QuickDocs PDF to Word</Application>
-  <AppVersion>1.0.0</AppVersion>
-</Properties>`);
-
-      // Create the main document with the extracted text
-      // Escape special characters and split by paragraphs
-      const paragraphs = fullText.split('\n\n').filter(p => p.trim());
-      
-      const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:body>
-    ${paragraphs.map(paragraph => 
-      `<w:p>
-        <w:r>
-          <w:t>${paragraph.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t>
-        </w:r>
-      </w:p>`
-    ).join('')}
-    <w:sectPr>
-      <w:pgSz w:w="12240" w:h="15840"/>
-      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
-    </w:sectPr>
-  </w:body>
-</w:document>`;
-
-      zip.file('word/document.xml', documentXml);
-
-      const docxBlob = await zip.generateAsync({ type: 'uint8array' });
-      return docxBlob;
-    },
-
-    async convertPdfToPowerpoint(file: File): Promise<Uint8Array> {
-      const images = await this.convertPdfToImages(file, 1.5);
-      
-      // Create a basic PPTX structure using JSZip
-      const zip = new JSZip();
-      
-      // Add basic PPTX structure
-      zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="jpeg" ContentType="image/jpeg"/>
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
-  <Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
-  <Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
-  ${images.map((_, index) => 
-    `<Override PartName="/ppt/slides/slide${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`
-  ).join('')}
-  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
-</Types>`);
-
-      // Add relationships
-      zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
-</Relationships>`);
-
-      // Create presentation.xml
-      zip.file('ppt/presentation.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" 
-               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" 
-               xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:sldMasterIdLst>
-    <p:sldMasterId id="2147483648" r:id="rId1"/>
-  </p:sldMasterIdLst>
-  <p:sldIdLst>
-    ${images.map((_, index) => `<p:sldId id="${256 + index}" r:id="rId${index + 2}"/>`).join('')}
-  </p:sldIdLst>
-  <p:sldSz cx="9144000" cy="6858000" type="screen4x3"/>
-  <p:notesSz cx="6858000" cy="9144000"/>
-  <p:defaultTextStyle>
-    <!-- Default text style -->
-  </p:defaultTextStyle>
-</p:presentation>`);
-
-      // Create presentation.xml.rels
-      zip.file('ppt/_rels/presentation.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>
-  ${images.map((_, index) => 
-    `<Relationship Id="rId${index + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${index + 1}.xml"/>`
-  ).join('')}
-</Relationships>`);
-
-      // Create slideMaster1.xml
-      zip.file('ppt/slideMasters/slideMaster1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" 
-            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" 
-            xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:cSld>
-    <p:bg>
-      <p:bgRef idx="1001">
-        <a:schemeClr val="bg1"/>
-      </p:bgRef>
-    </p:bg>
-    <p:spTree>
-      <p:nvGrpSpPr>
-        <p:cNvPr id="1" name=""/>
-        <p:cNvGrpSpPr/>
-        <p:nvPr/>
-      </p:nvGrpSpPr>
-      <p:grpSpPr>
-        <a:xfrm>
-          <a:off x="0" y="0"/>
-          <a:ext cx="0" cy="0"/>
-          <a:chOff x="0" y="0"/>
-          <a:chExt cx="0" cy="0"/>
-        </a:xfrm>
-      </p:grpSpPr>
-    </p:spTree>
-  </p:cSld>
-  <p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>
-</p:sldMaster>`);
-
-      // Create slideMaster1.xml.rels
-      zip.file('ppt/slideMasters/_rels/slideMaster1.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>
-</Relationships>`);
-
-      // Create theme1.xml
-      zip.file('ppt/theme/theme1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme">
-  <a:themeElements>
-    <a:clrScheme name="Office">
-      <a:dk1>
-        <a:sysClr val="windowText" lastClr="000000"/>
-      </a:dk1>
-      <a:lt1>
-        <a:sysClr val="window" lastClr="FFFFFF"/>
-      </a:lt1>
-      <a:dk2>
-        <a:srgbClr val="1F497D"/>
-      </a:dk2>
-      <a:lt2>
-        <a:srgbClr val="EEECE1"/>
-      </a:lt2>
-      <a:accent1>
-        <a:srgbClr val="4F81BD"/>
-      </a:accent1>
-      <a:accent2>
-        <a:srgbClr val="C0504D"/>
-      </a:accent2>
-      <a:accent3>
-        <a:srgbClr val="9BBB59"/>
-      </a:accent3>
-      <a:accent4>
-        <a:srgbClr val="8064A2"/>
-      </a:accent4>
-      <a:accent5>
-        <a:srgbClr val="4BACC6"/>
-      </a:accent5>
-      <a:accent6>
-        <a:srgbClr val="F79646"/>
-      </a:accent6>
-      <a:hlink>
-        <a:srgbClr val="0000FF"/>
-      </a:hlink>
-      <a:folHlink>
-        <a:srgbClr val="800080"/>
-      </a:folHlink>
-    </a:clrScheme>
-    <a:fontScheme name="Office">
-      <a:majorFont>
-        <a:latin typeface="Calibri"/>
-        <a:ea typeface=""/>
-        <a:cs typeface=""/>
-      </a:majorFont>
-      <a:minorFont>
-        <a:latin typeface="Calibri"/>
-        <a:ea typeface=""/>
-        <a:cs typeface=""/>
-      </a:minorFont>
-    </a:fontScheme>
-    <a:fmtScheme name="Office">
-      <!-- Format scheme content -->
-    </a:fmtScheme>
-  </a:themeElements>
-</a:theme>`);
-
-      // Create docProps files
-      zip.file('docProps/app.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" 
-           xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>QuickDocs PDF to PowerPoint</Application>
-  <Slides>${images.length}</Slides>
-</Properties>`);
-
-      zip.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" 
-                  xmlns:dc="http://purl.org/dc/elements/1.1/" 
-                  xmlns:dcterms="http://purl.org/dc/terms/" 
-                  xmlns:dcmitype="http://purl.org/dc/dcmitype/" 
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>PDF to PowerPoint Conversion</dc:title>
-  <dc:creator>QuickDocs</dc:creator>
-  <cp:lastModifiedBy>QuickDocs</cp:lastModifiedBy>
-  <cp:revision>1</cp:revision>
-  <dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created>
-  <dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified>
-</cp:coreProperties>`);
-
-      // Create slides folder
-      zip.folder('ppt/slides');
-      zip.folder('ppt/slides/_rels');
-
-      // Add each slide with its image
-      for (let i = 0; i < images.length; i++) {
-        const slideNum = i + 1;
-        const imageData = images[i].split(',')[1]; // Remove data URL prefix
-        
-        // Create slide XML
-        const slideXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" 
-      xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" 
-      xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:cSld>
-    <p:spTree>
-      <p:nvGrpSpPr>
-        <p:cNvPr id="1" name=""/>
-        <p:cNvGrpSpPr/>
-        <p:nvPr/>
-      </p:nvGrpSpPr>
-      <p:grpSpPr>
-        <a:xfrm>
-          <a:off x="0" y="0"/>
-          <a:ext cx="0" cy="0"/>
-          <a:chOff x="0" y="0"/>
-          <a:chExt cx="0" cy="0"/>
-        </a:xfrm>
-      </p:grpSpPr>
-      <p:pic>
-        <p:nvPicPr>
-          <p:cNvPr id="2" name="Slide Image"/>
-          <p:cNvPicPr>
-            <a:picLocks noChangeAspect="1"/>
-          </p:cNvPicPr>
-          <p:nvPr/>
-        </p:nvPicPr>
-        <p:blipFill>
-          <a:blip r:embed="rId1"/>
-          <a:stretch>
-            <a:fillRect/>
-          </a:stretch>
-        </p:blipFill>
-        <p:spPr>
-          <a:xfrm>
-            <a:off x="0" y="0"/>
-            <a:ext cx="9144000" cy="6858000"/>
-          </a:xfrm>
-          <a:prstGeom prst="rect">
-            <a:avLst/>
-          </a:prstGeom>
-        </p:spPr>
-      </p:pic>
-    </p:spTree>
-  </p:cSld>
-  <p:clrMapOvr>
-    <a:masterClrMapping/>
-  </p:clrMapOvr>
-</p:sld>`;
-
-        // Create slide relationship XML
-        const slideRelXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${slideNum}.jpeg"/>
-</Relationships>`;
-
-        // Add slide files
-        zip.file(`ppt/slides/slide${slideNum}.xml`, slideXml);
-        zip.file(`ppt/slides/_rels/slide${slideNum}.xml.rels`, slideRelXml);
-        
-        // Add image
-        zip.file(`ppt/media/image${slideNum}.jpeg`, imageData, { base64: true });
-      }
-
-      // Generate the PPTX file
-      const pptxBlob = await zip.generateAsync({ type: 'uint8array' });
-      return pptxBlob;
-    },
-
-    async convertWordToPdf(file: File): Promise<Uint8Array> {
-      try {
-        // Extract text from Word document
-        const arrayBuffer = await file.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer });
-        const text = result.value;
-
-        // Create PDF using jsPDF
-        const pdf = new jsPDF();
-        const pageHeight = pdf.internal.pageSize.height;
-        const pageWidth = pdf.internal.pageSize.width;
-        const margin = 20;
-        const lineHeight = 10;
-        const maxLineWidth = pageWidth - (margin * 2);
-
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(12);
-
-        const lines = pdf.splitTextToSize(text, maxLineWidth);
-        let y = margin;
-
-        for (let i = 0; i < lines.length; i++) {
-          if (y + lineHeight > pageHeight - margin) {
-            pdf.addPage();
-            y = margin;
-          }
-          pdf.text(lines[i], margin, y);
-          y += lineHeight;
-        }
-
-        return new Uint8Array(pdf.output('arraybuffer'));
-      } catch (error) {
-        throw new Error('Failed to convert Word document to PDF');
-      }
-    },
-
-    async convertPdfToExcel(file: File): Promise<Uint8Array> {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      
-      // Create a new workbook
-      const XLSX = await import('xlsx');
-      const workbook = XLSX.utils.book_new();
-      
-      // Process each page
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        
-        // Extract text items with their positions
-        const textItems = textContent.items.map((item: any) => ({
-          text: item.str,
-          x: Math.round(item.transform[4]),
-          y: Math.round(item.transform[5]),
-          width: item.width,
-          height: item.height
-        }));
-        
-        // Group text items by y-position (rows)
-        const rows: { [key: number]: any[] } = {};
-        const yTolerance = 5; // Items within this y-distance are considered on the same row
-        
-        textItems.forEach(item => {
-          // Find a row that's close enough to this item's y-position
-          const existingY = Object.keys(rows).find(y => 
-            Math.abs(parseInt(y) - item.y) < yTolerance
-          );
-          
-          const rowY = existingY ? parseInt(existingY) : item.y;
-          if (!rows[rowY]) rows[rowY] = [];
-          rows[rowY].push(item);
-        });
-        
-        // Sort rows by y-position (top to bottom)
-        const sortedRows = Object.entries(rows)
-          .sort((a, b) => parseInt(b[0]) - parseInt(a[0])) // Reverse order because PDF y-coordinates start from bottom
-          .map(([_, items]) => 
-            // Sort items in each row by x-position (left to right)
-            items.sort((a, b) => a.x - b.x).map(item => item.text)
-          );
-        
-        // Create worksheet data
-        const wsData = sortedRows.map(row => {
-          // If row has only one cell and it's empty, return an empty array
-          if (row.length === 1 && row[0].trim() === '') return [];
-          return row;
-        }).filter(row => row.length > 0); // Remove empty rows
-        
-        // Create worksheet and add to workbook
-        if (wsData.length > 0) {
-          const ws = XLSX.utils.aoa_to_sheet(wsData);
-          XLSX.utils.book_append_sheet(workbook, ws, `Page ${pageNum}`);
-        }
-      }
-      
-      // Write workbook to array buffer
-      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      return new Uint8Array(wbout);
-    },
-
-    async mergePdfs(files: File[]): Promise<Uint8Array> {
-      const mergedPdf = await PDFDocument.create();
-      
-      for (const file of files) {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await PDFDocument.load(arrayBuffer);
-        const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-        
-        pages.forEach((page) => mergedPdf.addPage(page));
-      }
-      
-      return await mergedPdf.save();
-    },
-
-    async splitPdf(file: File, pageRanges: PageRange[]): Promise<Uint8Array[]> {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await PDFDocument.load(arrayBuffer);
-      const results: Uint8Array[] = [];
-      
-      for (const range of pageRanges) {
-        const newPdf = await PDFDocument.create();
-        const pageIndices = [];
-        
-        for (let i = range.start - 1; i < range.end; i++) {
-          pageIndices.push(i);
-        }
-        
-        const pages = await newPdf.copyPages(pdf, pageIndices);
-        pages.forEach(page => newPdf.addPage(page));
-        
-        const pdfBytes = await newPdf.save();
-        results.push(pdfBytes);
-      }
-      
-      return results;
-    },
-
-    async compressPdf(file: File): Promise<Uint8Array> {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await PDFDocument.load(arrayBuffer);
-      
-      // Basic compression by re-saving
-      return await pdf.save();
-    },
-
-    async addWatermark(file: File, watermarkOptions: {
-      type: 'text' | 'image';
-      text?: string;
-      imageData?: string;
-      position: string;
-      opacity: number;
-      rotation: number;
-      fontSize?: number;
-      color?: string;
-      pages?: string;
-    }): Promise<Uint8Array> {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await PDFDocument.load(arrayBuffer);
-      
-      const pages = pdf.getPages();
-      const { type, text, imageData, position, opacity, rotation, fontSize = 24, color = '#000000' } = watermarkOptions;
-      
-      for (const page of pages) {
-        const { width, height } = page.getSize();
-        
-        if (type === 'text' && text) {
-          const font = await pdf.embedFont(StandardFonts.Helvetica);
-          const textWidth = font.widthOfTextAtSize(text, fontSize);
-          const textHeight = fontSize;
-          
-          let x = width / 2 - textWidth / 2;
-          let y = height / 2 - textHeight / 2;
-          
-          // Adjust position based on user selection
-          switch (position) {
-            case 'top-left':
-              x = 50;
-              y = height - 50;
-              break;
-            case 'top-right':
-              x = width - textWidth - 50;
-              y = height - 50;
-              break;
-            case 'bottom-left':
-              x = 50;
-              y = 50;
-              break;
-            case 'bottom-right':
-              x = width - textWidth - 50;
-              y = 50;
-              break;
-            case 'center':
-            default:
-              // Already set above
-              break;
-          }
-          
-          page.drawText(text, {
-            x,
-            y,
-            size: fontSize,
-            font,
-            color: rgb(
-              parseInt(color.slice(1, 3), 16) / 255,
-              parseInt(color.slice(3, 5), 16) / 255,
-              parseInt(color.slice(5, 7), 16) / 255
-            ),
-            opacity: opacity / 100,
-            rotate: degrees(rotation)
-          });
-        }
-        
-        if (type === 'image' && imageData) {
-          try {
-            const imageBytes = Uint8Array.from(atob(imageData.split(',')[1]), c => c.charCodeAt(0));
-            let embeddedImage;
-            
-            if (imageData.includes('data:image/png')) {
-              embeddedImage = await pdf.embedPng(imageBytes);
-            } else {
-              embeddedImage = await pdf.embedJpg(imageBytes);
-            }
-            
-            const imageDims = embeddedImage.scale(0.3);
-            
-            let x = width / 2 - imageDims.width / 2;
-            let y = height / 2 - imageDims.height / 2;
-            
-            // Adjust position
-            switch (position) {
-              case 'top-left':
-                x = 50;
-                y = height - imageDims.height - 50;
-                break;
-              case 'top-right':
-                x = width - imageDims.width - 50;
-                y = height - imageDims.height - 50;
-                break;
-              case 'bottom-left':
-                x = 50;
-                y = 50;
-                break;
-              case 'bottom-right':
-                x = width - imageDims.width - 50;
-                y = 50;
-                break;
-            }
-            
-            page.drawImage(embeddedImage, {
-              x,
-              y,
-              width: imageDims.width,
-              height: imageDims.height,
-              opacity: opacity / 100,
-              rotate: degrees(rotation)
-            });
-          } catch (error) {
-            console.error('Error embedding image:', error);
-          }
-        }
-      }
-      
-      return await pdf.save();
-    },
-
-    async addSignature(file: File, signatureOptions: {
-      type: 'draw' | 'text' | 'image';
-      signatureData?: string;
-      canvas?: HTMLCanvasElement;
-      x: number;
-      y: number;
-      width?: number;
-      height?: number;
-      pageNumber: number;
-      text?: string;
-      fontSize?: number;
-      color?: string;
-      fontFamily?: string;
-    }): Promise<Uint8Array> {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await PDFDocument.load(arrayBuffer);
-      
-      const pages = pdf.getPages();
-      const page = pages[signatureOptions.pageNumber - 1];
-      
-      if (!page) {
-        throw new Error('Invalid page number');
-      }
-      
-      const { type, signatureData, canvas, x, y, width = 150, height = 50, text, fontSize = 24, color = '#000000', fontFamily = 'Helvetica' } = signatureOptions;
-      const pageHeight = page.getSize().height;
-      
-      if (type === 'text' && text) {
-        let font: PDFFont;
         try {
-          switch (fontFamily) {
-            case 'Georgia':
-            case 'Verdana':
-              // Fallback to Helvetica for custom fonts in browser
-              font = await pdf.embedFont(StandardFonts.Helvetica);
-              break;
-            default:
-              font = await pdf.embedFont(StandardFonts.Helvetica);
+          const typedarray = new Uint8Array(event.target.result as ArrayBuffer);
+          const pdf = await pdfjsLib.getDocument(typedarray).promise;
+
+          if (pageNum < 1 || pageNum > pdf.numPages) {
+            return reject(new Error('Invalid page number.'));
           }
-        } catch {
-          font = await pdf.embedFont(StandardFonts.Helvetica);
+
+          const page = await pdf.getPage(pageNum);
+          const viewport = page.getViewport({ scale });
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          
+          if (!context) {
+            return reject(new Error('Failed to get canvas context.'));
+          }
+
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          const renderContext = {
+            canvasContext: context,
+            viewport: viewport,
+          };
+
+          await page.render(renderContext).promise;
+          resolve(canvas.toDataURL('image/jpeg'));
+        } catch (error) {
+          console.error(`Error rendering page ${pageNum}:`, error);
+          reject(error);
         }
-        
+      };
+      fileReader.onerror = (error) => {
+        console.error('FileReader error:', error);
+        reject(error);
+      };
+      fileReader.readAsArrayBuffer(file);
+    });
+  }
+
+  async convertPdfToImages(file: File, qualityMultiplier: number): Promise<string[]> {
+    const images: string[] = [];
+    const fileReader = new FileReader();
+
+    return new Promise((resolve, reject) => {
+      fileReader.onload = async (event) => {
+        if (!event.target?.result) {
+          return reject(new Error('Failed to read file.'));
+        }
+
+        try {
+          const typedarray = new Uint8Array(event.target.result as ArrayBuffer);
+          const pdf = await pdfjsLib.getDocument(typedarray).promise;
+
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale: 1.5 * qualityMultiplier });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            if (!context) {
+              return reject(new Error('Failed to get canvas context.'));
+            }
+
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            const renderContext = {
+              canvasContext: context,
+              viewport: viewport,
+            };
+
+            await page.render(renderContext).promise;
+            images.push(canvas.toDataURL('image/jpeg', 0.85));
+          }
+          resolve(images);
+        } catch (error) {
+          console.error('Error converting PDF to images:', error);
+          reject(error);
+        }
+      };
+
+      fileReader.onerror = (error) => {
+        console.error('FileReader error:', error);
+        reject(error);
+      };
+
+      fileReader.readAsArrayBuffer(file);
+    });
+  }
+
+  async convertWordToPdf(file: File, onProgress: (progress: number, message: string) => void): Promise<Blob> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        onProgress(10, 'Reading Word document...');
+        const arrayBuffer = await file.arrayBuffer();
+
+        // A memory-efficient way to convert ArrayBuffer to base64 to avoid stack-size errors.
+        const bufferToBase64 = (buffer: ArrayBuffer): string => {
+          let binary = '';
+          const bytes = new Uint8Array(buffer);
+          const len = bytes.byteLength;
+          for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          return btoa(binary);
+        }
+
+        onProgress(30, 'Converting .docx to HTML with embedded images...');
+        const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, {
+          convertImage: mammoth.images.imgElement(async (image) => {
+            const imageBuffer = await image.read();
+            const base64 = bufferToBase64(imageBuffer);
+            return { src: `data:${image.contentType};base64,${base64}` };
+          })
+        });
+
+        if (!html || html.trim() === '') {
+          return reject(new Error('The Word document appears to be empty.'));
+        }
+
+        onProgress(60, 'Styling HTML for PDF output...');
+        const styledHtml = `
+          <style>
+            body { font-family: 'Times New Roman', Times, serif; line-height: 1.5; }
+            p { margin-bottom: 1em; word-wrap: break-word; }
+            h1, h2, h3, h4, h5, h6 { margin-bottom: 0.5em; font-weight: bold; page-break-after: avoid; }
+            ul, ol { padding-left: 2em; page-break-inside: avoid; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+            th, td { border: 1px solid #ddd; padding: 8px; }
+            th { background-color: #f2f2f2; }
+            img { max-width: 100%; height: auto; display: block; }
+            /* CSS rules for page-breaking */
+            .page-break { page-break-after: always; }
+          </style>
+          ${html}
+        `;
+
+        onProgress(80, 'Rendering PDF...');
+        html2pdf()
+          .from(styledHtml)
+          .set({
+            margin: [0.75, 0.75, 0.75, 0.75],
+            filename: `${file.name.replace(/\.docx$/, '')}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+            // Use the library's robust page-breaking, guided by CSS rules.
+            pagebreak: { mode: ['css', 'legacy'] }
+          })
+          .output('blob')
+          .then((pdfBlob) => {
+            onProgress(100, 'Conversion complete!');
+            resolve(pdfBlob);
+          })
+          .catch(reject);
+
+      } catch (error) {
+        console.error("Error during Word to PDF conversion:", error);
+        reject(error);
+      }
+    });
+  }
+
+  async mergePdfs(files: File[]): Promise<Uint8Array> {
+    if (files.length === 0) {
+      throw new Error('No files provided for merging');
+    }
+
+    const mergedPdf = await PDFDocument.create();
+
+    for (const file of files) {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await PDFDocument.load(arrayBuffer);
+      const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      copiedPages.forEach((page) => mergedPdf.addPage(page));
+    }
+
+    const mergedPdfBytes = await mergedPdf.save();
+    return mergedPdfBytes;
+  }
+
+  async addSignatures(file: File, signatures: any[]): Promise<Uint8Array> {
+    const pdfDoc = await PDFDocument.load(await file.arrayBuffer());
+    const pages = pdfDoc.getPages();
+
+    for (const options of signatures) {
+      const { type, x, y, width, height, pageNumber, text, fontSize, color, fontFamily, signatureData } = options;
+      const page = pages[pageNumber - 1];
+
+      if (!page) {
+        console.warn(`Skipping signature on non-existent page ${pageNumber}`);
+        continue;
+      }
+
+      const { height: pageHeight } = page.getSize();
+      // pdf-lib's y-coordinate starts from the bottom of the page.
+      // The incoming 'y' is from the top. We also need to account for the signature's height.
+      const finalY = pageHeight - y - height;
+
+      if (type === 'text' && text) {
+        let finalFont = StandardFonts.Helvetica;
+        if (fontFamily && Object.values(StandardFonts).includes(fontFamily as StandardFonts)) {
+          finalFont = fontFamily as StandardFonts;
+        }
+        const embeddedFont = await pdfDoc.embedFont(finalFont);
         page.drawText(text, {
           x,
-          y: pageHeight - y - fontSize, // Convert from top-based to bottom-based coordinates
+          y: finalY,
+          font: embeddedFont,
           size: fontSize,
-          font,
-          color: rgb(
-            parseInt(color.slice(1, 3), 16) / 255,
-            parseInt(color.slice(3, 5), 16) / 255,
-            parseInt(color.slice(5, 7), 16) / 255
-          )
+          color: rgb(hexToRgb(color).red, hexToRgb(color).green, hexToRgb(color).blue),
+        });
+      } else if ((type === 'draw' || type === 'image') && signatureData) {
+        try {
+          const pngImage = await pdfDoc.embedPng(signatureData);
+          page.drawImage(pngImage, {
+            x,
+            y: finalY,
+            width,
+            height,
+          });
+        } catch (e) {
+          console.error("Error embedding signature image. It might be a non-PNG data URL.", e);
+        }
+      }
+    }
+
+    return pdfDoc.save();
+  }
+
+  async addWatermark(file: File, options: any): Promise<Blob> {
+    const { type, text, image, opacity, rotation, fontSize, color, x, y, width: watermarkWidth, height: watermarkHeight } = options;
+    const pdfDoc = await PDFDocument.load(await file.arrayBuffer());
+    const pages = pdfDoc.getPages();
+
+    let watermarkImage: PDFImage | undefined;
+    let watermarkFont: PDFFont | undefined;
+
+    if (type === 'image' && image) {
+      const imageBytes = await image.arrayBuffer();
+      if (image.type === 'image/jpeg') {
+        watermarkImage = await pdfDoc.embedJpg(imageBytes);
+      } else {
+        watermarkImage = await pdfDoc.embedPng(imageBytes);
+      }
+    } else if (type === 'text' && text) {
+        watermarkFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    }
+
+    if (!watermarkImage && !watermarkFont) {
+      throw new Error('Watermark asset not provided');
+    }
+
+    for (const page of pages) {
+      const pageDimensions = page.getSize();
+
+      const { width: pageWidth, height: pageHeight } = page.getSize();
+
+      if (type === 'text' && text && watermarkFont) {
+        const textWidth = watermarkFont.widthOfTextAtSize(text, fontSize);
+        const textHeight = watermarkFont.heightAtSize(fontSize);
+        page.drawText(text, {
+          x: (pageWidth - textWidth) / 2,
+          y: (pageHeight - textHeight) / 2,
+          font: watermarkFont,
+          size: fontSize,
+          color: rgb(hexToRgb(color).red, hexToRgb(color).green, hexToRgb(color).blue),
+          opacity: opacity / 100,
+          rotate: degrees(rotation),
+        });
+      } else if (type === 'image' && watermarkImage) {
+        page.drawImage(watermarkImage, {
+          x: (pageWidth - watermarkWidth) / 2,
+          y: (pageHeight - watermarkHeight) / 2,
+          width: watermarkWidth,
+          height: watermarkHeight,
+          opacity: opacity / 100,
+          rotate: degrees(rotation),
         });
       }
-      
-      if (type === 'draw' && canvas) {
-        try {
-          // Convert canvas to image data
-          const imageDataUrl = canvas.toDataURL('image/png');
-          const imageBytes = Uint8Array.from(atob(imageDataUrl.split(',')[1]), c => c.charCodeAt(0));
-          const embeddedImage = await pdf.embedPng(imageBytes);
-          
-          page.drawImage(embeddedImage, {
-            x,
-            y: pageHeight - y - height, // Convert coordinates
-            width,
-            height
-          });
-        } catch (error) {
-          console.error('Error embedding drawn signature:', error);
-          throw new Error('Failed to add drawn signature');
-        }
-      }
-      
-      if ((type === 'image') && signatureData) {
-        try {
-          const imageBytes = Uint8Array.from(atob(signatureData.split(',')[1]), c => c.charCodeAt(0));
-          let embeddedImage;
-          
-          if (signatureData.includes('data:image/png')) {
-            embeddedImage = await pdf.embedPng(imageBytes);
-          } else {
-            embeddedImage = await pdf.embedJpg(imageBytes);
-          }
-          
-          page.drawImage(embeddedImage, {
-            x,
-            y: pageHeight - y - height, // Convert coordinates
-            width,
-            height
-          });
-        } catch (error) {
-          console.error('Error embedding signature image:', error);
-          throw new Error('Failed to add signature');
-        }
-      }
-      
-      return await pdf.save();
-    },
-
-    createDownloadLink(data: Uint8Array, filename: string): string {
-      const blob = new Blob([data], { type: 'application/pdf' });
-      return URL.createObjectURL(blob);
     }
-  };
+
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  }
+
+  async splitPdf(file: File, ranges: { start: number; end: number }[]): Promise<Uint8Array[]> {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(arrayBuffer);
+    const totalPages = pdfDoc.getPageCount();
+
+    const splitPdfs: Uint8Array[] = [];
+
+    for (const range of ranges) {
+      const newPdf = await PDFDocument.create();
+      const pageIndices: number[] = [];
+      for (let i = range.start; i <= range.end; i++) {
+        // pdf-lib pages are 0-indexed, but user input is 1-indexed
+        if (i > 0 && i <= totalPages) {
+          pageIndices.push(i - 1);
+        }
+      }
+
+      if (pageIndices.length > 0) {
+        const copiedPages = await newPdf.copyPages(pdfDoc, pageIndices);
+        copiedPages.forEach((page) => newPdf.addPage(page));
+        const pdfBytes = await newPdf.save();
+        splitPdfs.push(pdfBytes);
+      }
+    }
+
+    if (splitPdfs.length === 0 && ranges.length > 0) {
+        throw new Error("Invalid page ranges provided. No pages were split.");
+    }
+
+    return splitPdfs;
+  }
+
+  async compressPdf(file: File, options?: { imageQuality: number, compressionLevel: string, preserveMetadata: boolean, optimizeForWeb: boolean }): Promise<Uint8Array> {
+    const { 
+        imageQuality = 0.92, // Prioritize quality over size
+        compressionLevel = 'medium',
+        preserveMetadata = true,
+    } = options || {};
+    
+    // Higher scale values for better rendering resolution
+    let scale = 1.5; // Default for 'medium'
+    if (compressionLevel === 'low') {
+        scale = 1.0;
+    } else if (compressionLevel === 'high') {
+        scale = 2.0;
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdfjsDoc = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer.slice(0))).promise;
+    const oldPdfDoc = await PDFDocument.load(arrayBuffer);
+    const newPdfDoc = await PDFDocument.create();
+
+    if (preserveMetadata) {
+        const title = oldPdfDoc.getTitle();
+        if (title) newPdfDoc.setTitle(title);
+        const author = oldPdfDoc.getAuthor();
+        if (author) newPdfDoc.setAuthor(author);
+        const subject = oldPdfDoc.getSubject();
+        if (subject) newPdfDoc.setSubject(subject);
+        const keywords = oldPdfDoc.getKeywords();
+        if (keywords) newPdfDoc.setKeywords(keywords.split(/\s*,\s*/));
+        const producer = oldPdfDoc.getProducer();
+        if (producer) newPdfDoc.setProducer(producer);
+        const creator = oldPdfDoc.getCreator();
+        if (creator) newPdfDoc.setCreator(creator);
+        const creationDate = oldPdfDoc.getCreationDate();
+        if (creationDate) newPdfDoc.setCreationDate(creationDate);
+        const modificationDate = oldPdfDoc.getModificationDate();
+        if (modificationDate) newPdfDoc.setModificationDate(modificationDate);
+    }
+
+    // New logic: Selectively compress pages.
+    // Pages with text are copied directly to preserve quality.
+    // Pages without text (likely images) are compressed.
+    for (let i = 1; i <= pdfjsDoc.numPages; i++) {
+        const page = await pdfjsDoc.getPage(i);
+        const operatorList = await page.getOperatorList();
+
+        // Check for text-drawing operators to determine if the page contains text.
+        const hasText = operatorList.fnArray.some(op => {
+            const opName = (pdfjsLib as any).OPS[op];
+            return opName === 'Tj' || opName === 'TJ' || opName === "'" || opName === '"';
+        });
+
+        if (hasText) {
+            // This page contains text. Copy it directly to preserve vector quality and text selectability.
+            const [copiedPage] = await newPdfDoc.copyPages(oldPdfDoc, [i - 1]);
+            newPdfDoc.addPage(copiedPage);
+        } else {
+            // This page does not contain text. Assume it's an image or vector graphic and apply compression.
+            const viewport = page.getViewport({ scale });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            if (context) {
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                const jpgDataUrl = canvas.toDataURL('image/jpeg', imageQuality);
+                const jpgBytes = await fetch(jpgDataUrl).then(res => res.arrayBuffer());
+                const jpgImage = await newPdfDoc.embedJpg(jpgBytes);
+                const newPage = newPdfDoc.addPage([viewport.width, viewport.height]);
+                newPage.drawImage(jpgImage, {
+                    x: 0,
+                    y: 0,
+                    width: viewport.width,
+                    height: viewport.height,
+                });
+            } else {
+                // Fallback in case canvas context cannot be created.
+                const [copiedPage] = await newPdfDoc.copyPages(oldPdfDoc, [i - 1]);
+                newPdfDoc.addPage(copiedPage);
+            }
+        }
+    }
+
+    return newPdfDoc.save({ useObjectStreams: true });
+  }
+
+  private _processImage(img: any): { data: Uint8Array; width: number; height: number; type: 'png' | 'jpeg' | 'gif'; } | null {
+    const { width, height, data, kind } = img;
+    try {
+        if (data.length > 8) {
+            if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) return { data, width, height, type: 'png' };
+            let jpegStartIndex = -1;
+            for (let i = 0; i < Math.min(10, data.length - 1); i++) {
+                if (data[i] === 0xFF && data[i+1] === 0xD8) { jpegStartIndex = i; break; }
+            }
+            if (jpegStartIndex !== -1 && data[data.length - 2] === 0xFF && data[data.length - 1] === 0xD9) return { data: data.slice(jpegStartIndex), width, height, type: 'jpeg' };
+            if (data[0] === 0x47 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x38) return { data, width, height, type: 'gif' };
+        }
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+        canvas.width = width;
+        canvas.height = height;
+        const imgData = ctx.createImageData(width, height);
+        const dst = imgData.data;
+        switch (kind) {
+            case 1: // GRAYSCALE_1BPP
+                let k = 0; const lineSize = (width + 7) >> 3;
+                for (let i = 0; i < height; i++) {
+                    for (let j = 0; j < width; j++) {
+                        const byte = data[i * lineSize + (j >> 3)]; const bit = 128 >> (j & 7);
+                        const C = byte & bit ? 0 : 255;
+                        dst[k++] = C; dst[k++] = C; dst[k++] = C; dst[k++] = 255;
+                    }
+                }
+                break;
+            case 2: // RGB_24BPP
+                let m = 0, i = 0;
+                while (i < data.length) { dst[m++] = data[i++]; dst[m++] = data[i++]; dst[m++] = data[i++]; dst[m++] = 255; }
+                break;
+            case 3: // RGBA_32BPP
+                dst.set(data); break;
+            case 4: // CMYK_32BPP
+                let n = 0, j = 0;
+                while (j < data.length) {
+                    const c = data[j++]; const m = data[j++]; const y = data[j++]; const k_ = data[j++];
+                    dst[n++] = 255 * (1 - c / 255) * (1 - k_ / 255);
+                    dst[n++] = 255 * (1 - m / 255) * (1 - k_ / 255);
+                    dst[n++] = 255 * (1 - y / 255) * (1 - k_ / 255);
+                    dst[n++] = 255;
+                }
+                break;
+            default:
+                console.error(`Unsupported image kind: ${kind}. Cannot process image.`); return null;
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        const pngDataUrl = canvas.toDataURL('image/png');
+        const base64Data = pngDataUrl.substring(pngDataUrl.indexOf(',') + 1);
+        const pngBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+        return { data: pngBytes, width, height, type: 'png' };
+    } catch (e) {
+        console.error(`Error processing image data (kind: ${kind}):`, e);
+        return null;
+    }
+  }
+
+  async convertPdfToWord(file: File, onProgress?: (progress: number, message: string) => void): Promise<{ docxBytes: Uint8Array, imageExtractionErrors: number }> {
+    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+    if (!apiKey) throw new Error("OpenRouter API key not found.");
+
+    onProgress?.(5, "Loading PDF...");
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+    
+    let combinedContent = '';
+    const imageData: { [key: string]: { data: Uint8Array, width: number, height: number } } = {};
+    let imageCounter = 0;
+    let imageExtractionErrors = 0;
+
+    onProgress?.(15, "Extracting content...");
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        combinedContent += textContent.items.map(item => ('str' in item ? item.str : '')).join(' ') + '\n\n';
+        
+        const operatorList = await page.getOperatorList();
+        for (let j = 0; j < operatorList.fnArray.length; j++) {
+            if (operatorList.fnArray[j] === pdfjsLib.OPS.paintImageXObject) {
+                const imgKey = operatorList.argsArray[j][0];
+                try {
+                    const img = await page.objs.get(imgKey);
+                    if (!img || !img.data) continue;
+                    const processedImage = this._processImage(img);
+                    if (processedImage) {
+                        const imageId = `[IMAGE_${imageCounter++}]`;
+                        imageData[imageId] = processedImage;
+                        combinedContent += `\n${imageId}\n`;
+                    } else {
+                        imageExtractionErrors++;
+                    }
+                } catch (e) {
+                    console.error(`Could not extract image ${imgKey}:`, e);
+                    imageExtractionErrors++;
+                }
+            }
+        }
+        combinedContent += `--- End of Page ${i} ---\n`;
+    }
+
+    onProgress?.(50, "AI is formatting the document...");
+    const systemPrompt = `You are a document analysis engine. Convert raw text into a structured JSON format. The JSON object must have a single key "document" which is an array of content blocks. Supported block types are 'heading1', 'heading2', 'paragraph', 'table', and 'image'. For 'table', the content must be a 2D array of strings. For 'image', the content is the image placeholder (e.g., '[IMAGE_0]'). Preserve the order of text and images as they appear. Your response must be only the valid JSON object.`;
+
+    const response = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      { model: "google/gemini-flash-1.5", response_format: { type: "json_object" }, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: combinedContent }] },
+      { headers: { "Authorization": `Bearer ${apiKey}` } }
+    );
+
+    onProgress?.(75, "Generating Word document...");
+    const structuredContent = JSON.parse(response.data.choices[0].message.content);
+    const docChildren: (Paragraph | Table)[] = [];
+
+    for (const block of structuredContent.document) {
+        try {
+            switch (block.type) {
+                case 'heading1':
+                    docChildren.push(new Paragraph({ text: block.content, heading: HeadingLevel.HEADING_1 }));
+                    break;
+                case 'heading2':
+                    docChildren.push(new Paragraph({ text: block.content, heading: HeadingLevel.HEADING_2 }));
+                    break;
+                case 'paragraph':
+                    docChildren.push(new Paragraph({ children: [new TextRun(block.content)] }));
+                    break;
+                case 'table':
+                    const tableRows = (block.content as string[][]).map(row => 
+                        new TableRow({ children: row.map(cellText => new TableCell({ children: [new Paragraph(cellText)] })) })
+                    );
+                    docChildren.push(new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
+                    break;
+                case 'image':
+                    const imageId = block.content;
+                    const imgDetails = imageData[imageId];
+                    if (imgDetails) {
+                        const maxWidth = 600;
+                        const newWidth = imgDetails.width > maxWidth ? maxWidth : imgDetails.width;
+                        const newHeight = (imgDetails.height * newWidth) / imgDetails.width;
+                        docChildren.push(new Paragraph({ children: [ new ImageRun({ data: imgDetails.data, transformation: { width: newWidth, height: newHeight } }) ] }));
+                    }
+                    break;
+            }
+        } catch(e) {
+            console.error('Error processing block:', block, e);
+        }
+    }
+
+    const doc = new Document({ sections: [{ children: docChildren }] });
+    const blob = await Packer.toBlob(doc);
+    const docxBytes = new Uint8Array(await blob.arrayBuffer());
+    onProgress?.(100, "Conversion complete!");
+    return { docxBytes, imageExtractionErrors };
+  }
+
+  async convertPdfToPowerpoint(file: File, onProgress?: (progress: number, message: string) => void): Promise<{ pptxBytes: Uint8Array, imageExtractionErrors: number }> {
+    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error("OpenRouter API key not found. Please add VITE_OPENROUTER_API_KEY to your .env file.");
+    }
+
+    onProgress?.(5, "Loading PDF...");
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+    
+    let combinedContent = '';
+    const imageData: { [key: string]: { data: Uint8Array, width: number, height: number, type: 'png' | 'jpeg' | 'gif' } } = {};
+    let imageCounter = 0;
+    let imageExtractionErrors = 0;
+
+    onProgress?.(15, "Extracting content from PDF...");
+    for (let j = 1; j <= pdf.numPages; j++) {
+        const page = await pdf.getPage(j);
+        const textContent = await page.getTextContent();
+        combinedContent += textContent.items.map(item => ('str' in item ? item.str : '')).join(' ') + '\n\n';
+
+        const operatorList = await page.getOperatorList();
+        for (let k = 0; k < operatorList.fnArray.length; k++) {
+            if (operatorList.fnArray[k] === pdfjsLib.OPS.paintImageXObject) {
+                const imgKey = operatorList.argsArray[k][0];
+                try {
+                    const img = await page.objs.get(imgKey);
+                    if (!img || !img.data) continue;
+
+                    const processedImage = this._processImage(img);
+                    if (processedImage) {
+                        const imageId = `[IMAGE_${imageCounter++}]`;
+                        imageData[imageId] = processedImage;
+                        combinedContent += `\n${imageId}\n`;
+                    }
+                } catch (e) {
+                    console.error(`Could not extract image ${imgKey} from PDF structure:`, e);
+                    imageExtractionErrors++;
+                }
+            }
+        }
+        combinedContent += `--- End of Page ${j} ---\n`;
+    }
+
+    if (imageExtractionErrors > 0) {
+        console.warn(`${imageExtractionErrors} image(s) could not be extracted. They will be missing from the presentation.`);
+    }
+    
+    onProgress?.(50, "AI is designing the presentation...");
+    const systemPrompt = `You are an expert presentation designer. Your task is to transform raw text and image placeholders from a PDF into a visually compelling and well-structured PowerPoint presentation, formatted as a JSON object.
+
+The JSON object must have a single root key "presentation", containing two keys: "title" (a string for the main title of the entire presentation) and "slides" (an array of slide objects).
+
+Each slide object must contain:
+1.  "title": A concise, impactful title for the slide.
+2.  "layout": A string specifying the slide layout. Choose from: 'title_only', 'text_only', 'text_and_image', 'image_only'.
+3.  "content": An object containing the slide's content, which varies by layout:
+    - For 'title_only': An empty object {}.
+    - For 'text_only': An object with a "bullets" key, which is an array of short, clear strings.
+    - For 'text_and_image': An object with "bullets" (array of strings) and "image" (an object with "id" and "position" ('left' or 'right')).
+    - For 'image_only': An object with an "image" key (containing "id").
+
+Design Principles:
+-   Clarity and Brevity: Convert dense paragraphs into succinct bullet points. Each slide should convey a single, clear idea.
+-   Visual Hierarchy: Use layouts strategically. A slide with a key graphic might use 'text_and_image', while a summary slide might be 'text_only'.
+-   Logical Flow: Group related information. Use page breaks ('--- End of Page X ---') as a strong hint to start a new slide.
+-   Professionalism: Start with a 'title_only' slide for the main presentation title.
+
+Your response must be ONLY the valid JSON object.
+Example:
+{
+  "presentation": {
+    "title": "The Future of Artificial Intelligence",
+    "slides": [
+      {
+        "title": "The Future of Artificial Intelligence",
+        "layout": "title_only",
+        "content": {}
+      },
+      {
+        "title": "Key Concepts",
+        "layout": "text_and_image",
+        "content": {
+          "bullets": ["Machine Learning", "Deep Learning", "Neural Networks"],
+          "image": { "id": "[IMAGE_0]", "position": "right" }
+        }
+      }
+    ]
+  }
+}`;
+
+    const response = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      { model: "google/gemini-flash-1.5", response_format: { type: "json_object" }, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: combinedContent }] },
+      { headers: { "Authorization": `Bearer ${apiKey}` } }
+    );
+
+    onProgress?.(75, "Generating PowerPoint slides...");
+    const structuredContent = JSON.parse(response.data.choices[0].message.content);
+    const presentationData = structuredContent.presentation;
+
+    const pptx = new PptxGenJS();
+    pptx.layout = 'LAYOUT_16x9';
+    pptx.author = 'QuickDocs Tools';
+    pptx.company = 'Generated Presentation';
+    pptx.title = presentationData.title;
+
+    const bufferToBase64 = (buffer: Uint8Array): string => {
+        let binary = '';
+        const len = buffer.byteLength;
+        for (let i = 0; i < len; i++) { binary += String.fromCharCode(buffer[i]); }
+        return btoa(binary);
+    }
+
+    for (const slideData of presentationData.slides) {
+        const slide = pptx.addSlide();
+        switch (slideData.layout) {
+            case 'title_only':
+                slide.addText(slideData.title, { x: 0.5, y: 2.5, w: '90%', h: 1.5, align: 'center', fontSize: 44, bold: true });
+                break;
+            case 'text_only':
+                slide.addText(slideData.title, { x: 0.5, y: 0.25, w: '90%', h: 0.75, align: 'center', fontSize: 32, bold: true });
+                if (slideData.content.bullets && slideData.content.bullets.length > 0) {
+                    slide.addText(slideData.content.bullets.join('\n'), { x: 1.0, y: 1.5, w: '80%', h: '75%', fontSize: 20, bullet: true });
+                }
+                break;
+            case 'image_only':
+                const imgDetails = imageData[slideData.content.image.id];
+                if (imgDetails) {
+                    const dataUrl = `data:image/${imgDetails.type};base64,${bufferToBase64(imgDetails.data)}`;
+                    slide.addImage({ data: dataUrl, x: 0, y: 0, w: '100%', h: '100%' });
+                    slide.addText(slideData.title, { x: 0.5, y: '90%', w: '90%', h: 0.5, align: 'center', fontSize: 24, bold: true, color: 'FFFFFF', outline: { size: 1, color: '000000' } });
+                }
+                break;
+            case 'text_and_image':
+                slide.addText(slideData.title, { x: 0.5, y: 0.25, w: '90%', h: 0.75, align: 'center', fontSize: 32, bold: true });
+                const { bullets, image } = slideData.content;
+                const imageDetails = imageData[image.id];
+                const textProps = { x: 0.5, y: 1.5, w: '45%', h: '75%', fontSize: 18, bullet: true };
+                const imgProps = { y: 1.5, w: 4.5 };
+
+                if (image.position === 'right') {
+                    if (bullets && bullets.length > 0) slide.addText(bullets.join('\n'), textProps);
+                    if (imageDetails) {
+                        const dataUrl = `data:image/${imageDetails.type};base64,${bufferToBase64(imageDetails.data)}`;
+                        slide.addImage({ data: dataUrl, x: 5.25, ...imgProps, h: imgProps.w * (imageDetails.height / imageDetails.width) });
+                    }
+                } else { // position 'left'
+                    if (bullets && bullets.length > 0) slide.addText(bullets.join('\n'), { ...textProps, x: 5.25 });
+                    if (imageDetails) {
+                        const dataUrl = `data:image/${imageDetails.type};base64,${bufferToBase64(imageDetails.data)}`;
+                        slide.addImage({ data: dataUrl, x: 0.5, ...imgProps, h: imgProps.w * (imageDetails.height / imageDetails.width) });
+                    }
+                }
+                break;
+        }
+    }
+
+    onProgress?.(95, "Finalizing presentation...");
+    const pptxBlob = await pptx.write('blob');
+    const pptxBuffer = await pptxBlob.arrayBuffer();
+    
+    onProgress?.(100, "Conversion complete!");
+    return { pptxBytes: new Uint8Array(pptxBuffer), imageExtractionErrors };
+  }
+
+  async convertPdfToExcel(file: File, onProgress?: (progress: number, message: string) => void): Promise<Uint8Array> {
+    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+    if (!apiKey) throw new Error("OpenRouter API key not found.");
+
+    onProgress?.(5, "Loading PDF...");
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+    const numPages = pdf.numPages;
+    
+    const allTables: { name: string, data: string[][] }[] = [];
+    const systemPrompt = `You are a data extraction expert. Your task is to find all tables in the text and convert them into a structured JSON format.
+Follow these rules strictly:
+1.  Your entire response MUST be a single, valid JSON object. Do not add any text before or after the JSON.
+2.  The root of the JSON object must be a key named "tables".
+3.  The "tables" key must be an array of table objects.
+4.  Each table object must have a "name" (string, for the sheet name) and "data" (an array of arrays, for the rows).
+5.  All data in the rows must be strings.
+6.  Crucially, you must correctly escape all special characters within the strings. A double quote (") inside a string must be escaped as \\". A backslash (\\) must be escaped as \\\\.
+
+If you find no tables, return exactly: {"tables": []}`;
+
+    for (let i = 1; i <= numPages; i++) {
+        const progress = 10 + 60 * (i / numPages);
+        onProgress?.(progress, `AI is processing page ${i} of ${numPages}...`);
+        
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => ('str' in item ? item.str : '')).join(' ');
+
+        if (pageText.trim().length === 0) continue; // Skip empty pages
+
+        try {
+            const response = await axios.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                { model: "google/gemini-flash-1.5", response_format: { type: "json_object" }, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: pageText }] },
+                { headers: { "Authorization": `Bearer ${apiKey}` }, timeout: 30000 } // 30s timeout
+            );
+
+            const rawResponse = response.data.choices[0].message.content;
+            const jsonStart = rawResponse.indexOf('{');
+            const jsonEnd = rawResponse.lastIndexOf('}');
+            
+            if (jsonStart !== -1 && jsonEnd !== -1) {
+                const jsonString = rawResponse.substring(jsonStart, jsonEnd + 1);
+                const structuredData = JSON.parse(jsonString);
+                if (structuredData.tables && structuredData.tables.length > 0) {
+                    const pageTables = structuredData.tables.map((table: any, index: number) => ({
+                        ...table,
+                        name: `Page ${i} - ${table.name || `Table ${index + 1}`}`
+                    }));
+                    allTables.push(...pageTables);
+                }
+            }
+        } catch (e) {
+            console.warn(`Could not process tables on page ${i}.`, e);
+        }
+    }
+
+    if (allTables.length === 0) {
+        throw new Error("No tables were found in the PDF after processing all pages.");
+    }
+
+    onProgress?.(80, "Generating Excel file...");
+    const workbook = new ExcelJS.Workbook();
+    const sheetNames = new Set<string>();
+
+    for (const table of allTables) {
+        let originalSheetName = table.name.replace(/[:\\/?*\[\]]/g, '').substring(0, 31);
+        let finalSheetName = originalSheetName;
+        let counter = 1;
+        while (sheetNames.has(finalSheetName)) {
+            const suffix = ` (${counter++})`;
+            finalSheetName = originalSheetName.substring(0, 31 - suffix.length) + suffix;
+        }
+        sheetNames.add(finalSheetName);
+
+        const worksheet = workbook.addWorksheet(finalSheetName);
+        worksheet.addRows(table.data);
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    onProgress?.(100, "Conversion complete!");
+    return new Uint8Array(buffer);
+  }
+
+  createDownloadLink(pdfBytes: Uint8Array, fileName: string): string {
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    return URL.createObjectURL(blob);
+  }
 }
+
+export const createPdfProcessor = () => {
+  return new PdfProcessor();
+};

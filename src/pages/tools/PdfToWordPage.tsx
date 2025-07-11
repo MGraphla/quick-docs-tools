@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { createPdfProcessor, formatFileSize, type PdfInfo } from "@/lib/pdfUtils";
+import { formatFileSize } from "@/lib/pdfUtils";
 import { saveAs } from 'file-saver';
+import * as pdfjsLib from 'pdfjs-dist';
 
 interface ConvertedFile {
   name: string;
@@ -21,7 +22,7 @@ interface ConvertedFile {
 }
 
 const PdfToWordPage = () => {
-  const [files, setFiles] = useState<Array<{ id: string; file: File; info?: PdfInfo; size: string }>>([]);
+  const [files, setFiles] = useState<Array<{ id: string; file: File; size: string; pageCount: number }>>([]);
   const [converting, setConverting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [convertedFiles, setConvertedFiles] = useState<ConvertedFile[]>([]);
@@ -33,7 +34,7 @@ const PdfToWordPage = () => {
   const [ocrEnabled, setOcrEnabled] = useState(false);
   const [previewFile, setPreviewFile] = useState<ConvertedFile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pdfProcessor = createPdfProcessor();
+
 
   const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -57,12 +58,13 @@ const PdfToWordPage = () => {
       
       for (const file of validFiles) {
         try {
-          const info = await pdfProcessor.loadPdf(file);
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
           newFiles.push({
             id: generateId(),
             file,
-            info,
-            size: formatFileSize(file.size)
+            size: formatFileSize(file.size),
+            pageCount: pdf.numPages
           });
         } catch (error) {
           console.error(`Error loading ${file.name}:`, error);
@@ -107,76 +109,83 @@ const PdfToWordPage = () => {
 
   const convertToWord = async () => {
     if (files.length === 0) {
-      toast.error("Please select PDF files to convert");
+      toast.error("Please select at least one PDF file to convert.");
       return;
     }
 
+    const apiKey = 'YbRmK3oiAlJm7hJ2YyDqdfBcJJ5rhWiL';
+
     setConverting(true);
     setProgress(0);
-    setProgressMessage("Preparing conversion...");
-    setConvertedFiles([]);
+    setProgressMessage("Initializing conversion...");
+    const newConvertedFiles: ConvertedFile[] = [];
 
-    try {
-      const converted: ConvertedFile[] = [];
-      
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setProgress(((i + 1) / files.length) * 100);
-        setProgressMessage(`Converting ${file.file.name}...`);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setProgressMessage(`[${i + 1}/${files.length}] Uploading ${file.file.name}...`);
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file.file);
+
+        const response = await fetch(`https://v2.convertapi.com/convert/pdf/to/docx?Secret=${apiKey}`,
+          {
+            method: 'POST',
+            body: formData,
+          }
+        );
         
-        try {
-          // Perform actual PDF to Word conversion
-          const convertedBytes = await pdfProcessor.convertPdfToWord(file.file);
-          
-          // Create a proper Word document file
-          const fileName = file.file.name.replace(/\.pdf$/i, '.docx');
-          const blob = new Blob([convertedBytes], { 
-            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-          });
-          const url = URL.createObjectURL(blob);
-          
-          converted.push({
-            name: fileName,
-            url,
-            size: formatFileSize(convertedBytes.length),
-            bytes: convertedBytes,
-            pages: file.info?.pageCount || 0
-          });
-        } catch (error) {
-          console.error(`Error converting ${file.file.name}:`, error);
-          toast.error(`Failed to convert ${file.file.name}`);
+        setProgress((i + 1) / files.length * 50 + 45);
+        setProgressMessage(`[${i + 1}/${files.length}] Processing ${file.file.name}...`);
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`API Error: ${errorData.error} - ${errorData.message}`);
+        }
+
+        const result = await response.json();
+        const convertedFileData = result.Files[0];
+        const base64 = convertedFileData.FileData;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let j = 0; j < byteCharacters.length; j++) {
+          byteNumbers[j] = byteCharacters.charCodeAt(j);
+        }
+        const docxBytes = new Uint8Array(byteNumbers);
+
+        const fileName = file.file.name.replace(/\.pdf$/i, '.docx');
+        const blob = new Blob([docxBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const url = URL.createObjectURL(blob);
+        
+        newConvertedFiles.push({
+          name: fileName,
+          url,
+          size: formatFileSize(docxBytes.length),
+          bytes: docxBytes,
+          pages: file.pageCount,
+        });
+
+      } catch (error) {
+        console.error(`Error converting ${file.file.name}:`, error);
+        if (error instanceof Error) {
+            toast.error(`Failed to convert ${file.file.name}: ${error.message}`);
+        } else {
+            toast.error(`An unknown error occurred while converting ${file.file.name}.`);
         }
       }
-      
-      if (converted.length > 0) {
-        setConvertedFiles(converted);
-        setProgress(100);
-        setProgressMessage("Conversion completed!");
-        toast.success(`Successfully converted ${converted.length} PDF file${converted.length > 1 ? 's' : ''} to Word format`);
-      }
-      
-    } catch (error) {
-      console.error('Conversion error:', error);
-      toast.error(error instanceof Error ? error.message : "Conversion failed. Please try again.");
-    } finally {
-      setConverting(false);
-      setProgress(0);
-      setProgressMessage("");
+    }
+
+    setConvertedFiles(prev => [...prev, ...newConvertedFiles]);
+    setConverting(false);
+    if (newConvertedFiles.length > 0) {
+        toast.success(`${newConvertedFiles.length} of ${files.length} file(s) converted successfully.`);
     }
   };
 
   const downloadFile = (file: ConvertedFile) => {
-    try {
-      // Use FileSaver.js to ensure proper download with correct MIME type
-      const blob = new Blob([file.bytes], { 
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-      });
-      saveAs(blob, file.name);
-      toast.success(`Downloaded ${file.name}`);
-    } catch (error) {
-      console.error('Download error:', error);
-      toast.error("Failed to download file. Please try again.");
-    }
+    const blob = new Blob([file.bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    saveAs(blob, file.name);
+    toast.success(`Downloaded ${file.name}`);
   };
 
   const previewDocument = (file: ConvertedFile) => {
@@ -200,7 +209,7 @@ const PdfToWordPage = () => {
   };
 
   const totalSize = files.reduce((sum, file) => sum + file.file.size, 0);
-  const totalPages = files.reduce((sum, file) => sum + (file.info?.pageCount || 0), 0);
+  const totalPages = files.reduce((sum, file) => sum + file.pageCount, 0);
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6 max-w-5xl">
@@ -379,9 +388,11 @@ const PdfToWordPage = () => {
                           </h4>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span>{file.info?.pageCount || 0} pages</span>
+                          <span>{file.file.size / 1024} KB</span>
                           <span>•</span>
                           <span>{file.size}</span>
+                          <span>•</span>
+                          <span>{file.pageCount} pages</span>
                         </div>
                       </div>
                       

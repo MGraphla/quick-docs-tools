@@ -10,6 +10,8 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
 import * as pdfjsLib from 'pdfjs-dist';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.mjs`;
 import { PDFDocument } from 'pdf-lib';
 
 interface RedactedFile {
@@ -246,7 +248,7 @@ const RedactPdfPage = () => {
       const matches: RedactionArea[] = [];
       
       for (const item of textContent.items) {
-        const textItem = item as pdfjsLib.TextItem;
+        const textItem = item as any; // Using any as TextItem is not directly exported
         if (textItem.str.toLowerCase().includes(searchText.toLowerCase())) {
           // Get the position and dimensions of the text
           const tx = textItem.transform;
@@ -348,7 +350,7 @@ const RedactPdfPage = () => {
             y,
             width: redaction.width,
             height: redaction.height,
-            color: { r: 0, g: 0, b: 0 },
+            color: { red: 0, green: 0, blue: 0 },
             opacity: 1
           });
         });

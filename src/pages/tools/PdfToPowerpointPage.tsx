@@ -114,55 +114,55 @@ const PdfToPowerpointPage = () => {
     setConverting(true);
     setProgress(0);
     setProgressMessage("Preparing conversion...");
-    setConvertedFiles([]);
+    const newConvertedFiles: ConvertedFile[] = [];
 
-    try {
-      const converted: ConvertedFile[] = [];
-      
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setProgress(((i + 1) / files.length) * 100);
-        setProgressMessage(`Converting ${file.file.name}...`);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const progressFn = (p: number, m: string) => {
+        setProgress(p);
+        setProgressMessage(m);
+      }
+
+      try {
+        const result = await pdfProcessor.convertPdfToPowerpoint(file.file, progressFn);
+        const convertedBytes = result.pptxBytes;
+
+        if (result.imageExtractionErrors > 0) {
+          toast.warning(`${result.imageExtractionErrors} image(s) in ${file.file.name} could not be processed and were skipped.`);
+        }
+
+        const fileName = file.file.name.replace(/\.pdf$/i, '.pptx');
+        const blob = new Blob([convertedBytes], { 
+          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
+        });
+        const url = URL.createObjectURL(blob);
         
-        try {
-          // Perform actual PDF to PowerPoint conversion
-          const convertedBytes = await pdfProcessor.convertPdfToPowerpoint(file.file);
-          
-          // Create a proper PowerPoint file
-          const fileName = file.file.name.replace(/\.pdf$/i, '.pptx');
-          const blob = new Blob([convertedBytes], { 
-            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
-          });
-          const url = URL.createObjectURL(blob);
-          
-          converted.push({
-            name: fileName,
-            url,
-            size: formatFileSize(convertedBytes.length),
-            bytes: convertedBytes,
-            pages: file.info?.pageCount || 0
-          });
-        } catch (error) {
-          console.error(`Error converting ${file.file.name}:`, error);
-          toast.error(`Failed to convert ${file.file.name}`);
+        newConvertedFiles.push({
+          name: fileName,
+          url,
+          size: formatFileSize(convertedBytes.length),
+          bytes: convertedBytes,
+          pages: file.info?.pageCount || 0
+        });
+
+      } catch (error) {
+        console.error(`Error converting ${file.file.name}:`, error);
+        if (error instanceof Error) {
+            toast.error(`Failed to convert ${file.file.name}: ${error.message}`);
+        } else {
+            toast.error(`An unknown error occurred while converting ${file.file.name}.`);
         }
       }
-      
-      if (converted.length > 0) {
-        setConvertedFiles(converted);
-        setProgress(100);
-        setProgressMessage("Conversion completed!");
-        toast.success(`Successfully converted ${converted.length} PDF file${converted.length > 1 ? 's' : ''} to PowerPoint format`);
-      }
-      
-    } catch (error) {
-      console.error('Conversion error:', error);
-      toast.error(error instanceof Error ? error.message : "Conversion failed. Please try again.");
-    } finally {
-      setConverting(false);
-      setProgress(0);
-      setProgressMessage("");
     }
+    
+    if (newConvertedFiles.length > 0) {
+      setConvertedFiles(prev => [...prev, ...newConvertedFiles]);
+      toast.success(`Successfully converted ${newConvertedFiles.length} of ${files.length} file(s) to PowerPoint.`);
+    }
+
+    setConverting(false);
+    setProgress(0);
+    setProgressMessage("");
   };
 
   const downloadFile = (file: ConvertedFile) => {
@@ -196,22 +196,22 @@ const PdfToPowerpointPage = () => {
   const totalPages = files.reduce((sum, file) => sum + (file.info?.pageCount || 0), 0);
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-6 md:space-y-8 max-w-6xl mx-auto p-4">
       {/* Header */}
       <div className="text-center">
         <div className="inline-flex items-center bg-red-100 text-red-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
           <Presentation className="h-4 w-4 mr-2" />
           PDF to PowerPoint Converter
         </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">PDF to PowerPoint</h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">PDF to PowerPoint</h1>
+        <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
           Transform your PDF documents into PowerPoint presentations with preserved layouts and professional slide formatting.
         </p>
       </div>
 
       {/* Upload Area */}
       <Card className="border-2 border-dashed border-gray-300 hover:border-red-400 transition-all duration-300">
-        <CardContent className="p-8">
+        <CardContent className="p-6 sm:p-8">
           <div
             className={`text-center transition-all duration-300 cursor-pointer ${
               dragOver ? 'scale-105 bg-red-50' : ''
@@ -226,10 +226,10 @@ const PdfToPowerpointPage = () => {
                 <Upload className="h-10 w-10 text-white" />
               </div>
             </div>
-            <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+            <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
               Drop PDF files here or click to browse
             </h3>
-            <p className="text-gray-600 mb-6 text-lg">
+            <p className="text-base sm:text-lg text-gray-600 mb-6">
               Convert PDF documents to PowerPoint presentations
             </p>
             <Button size="lg" className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700">
@@ -261,7 +261,7 @@ const PdfToPowerpointPage = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label>Conversion Quality</Label>
                 <Select value={conversionQuality} onValueChange={setConversionQuality}>
@@ -290,14 +290,14 @@ const PdfToPowerpointPage = () => {
 
             <div className="space-y-4">
               <h4 className="font-medium text-gray-900">Conversion Options</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="oneSlidePerPage"
                     checked={oneSlidePerPage}
                     onCheckedChange={(checked) => setOneSlidePerPage(checked as boolean)}
                   />
-                  <Label htmlFor="oneSlidePerPage">One slide per PDF page</Label>
+                  <Label htmlFor="oneSlidePerPage" className="cursor-pointer">One slide per PDF page</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -305,7 +305,7 @@ const PdfToPowerpointPage = () => {
                     checked={preserveImages}
                     onCheckedChange={(checked) => setPreserveImages(checked as boolean)}
                   />
-                  <Label htmlFor="preserveImages">Preserve images and graphics</Label>
+                  <Label htmlFor="preserveImages" className="cursor-pointer">Preserve images and graphics</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -313,7 +313,7 @@ const PdfToPowerpointPage = () => {
                     checked={preserveFormatting}
                     onCheckedChange={(checked) => setPreserveFormatting(checked as boolean)}
                   />
-                  <Label htmlFor="preserveFormatting">Preserve text formatting</Label>
+                  <Label htmlFor="preserveFormatting" className="cursor-pointer">Preserve text formatting</Label>
                 </div>
               </div>
             </div>
@@ -325,7 +325,7 @@ const PdfToPowerpointPage = () => {
       {files.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
@@ -345,29 +345,29 @@ const PdfToPowerpointPage = () => {
               {files.map((file, index) => (
                 <div
                   key={file.id}
-                  className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                  className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-lg">
                     <FileText className="h-6 w-6 text-red-600" />
                   </div>
                   
-                  <div className="flex-1">
+                  <div className="flex-1 w-full">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge variant="secondary" className="text-xs">
                         #{index + 1}
                       </Badge>
-                      <h4 className="font-medium text-gray-900 truncate">
+                      <h4 className="font-medium text-gray-900 break-all sm:break-words sm:truncate">
                         {file.file.name}
                       </h4>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
                       <span>{file.info?.pageCount || 0} pages</span>
                       <span>{file.size}</span>
                       <span>{new Date(file.file.lastModified).toLocaleDateString()}</span>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-2 self-end sm:self-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <Button variant="ghost" size="sm">
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -436,7 +436,7 @@ const PdfToPowerpointPage = () => {
           <CardContent>
             <div className="space-y-3">
               {convertedFiles.map((file, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm group">
+                <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-white rounded-lg shadow-sm">
                   <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-lg">
                     <Presentation className="h-5 w-5 text-red-600" />
                   </div>
@@ -454,7 +454,7 @@ const PdfToPowerpointPage = () => {
                       <span>{file.size}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 self-end sm:self-center">
                     <Button variant="ghost" size="sm">
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -462,6 +462,7 @@ const PdfToPowerpointPage = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => downloadFile(file)}
+                      className="w-full sm:w-auto"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Download
