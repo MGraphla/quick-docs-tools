@@ -908,6 +908,48 @@ If you find no tables, return exactly: {"tables": []}`;
     return new Uint8Array(buffer);
   }
 
+  async protectPdf(file: File, password: string, permissions: any): Promise<Uint8Array> {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(arrayBuffer);
+
+    // Set user password (password required to open the document)
+    if (password) {
+      // Create permission flags based on the permissions object
+      const permissionFlags: any = {};
+      
+      if (!permissions.printing) {
+        permissionFlags.printing = false;
+      }
+      if (!permissions.copying) {
+        permissionFlags.copying = false;
+      }
+      if (!permissions.editing) {
+        permissionFlags.modifying = false;
+      }
+      if (!permissions.commenting) {
+        permissionFlags.annotating = false;
+      }
+      if (!permissions.formFilling) {
+        permissionFlags.fillingForms = false;
+      }
+      if (!permissions.contentExtraction) {
+        permissionFlags.contentAccessibility = false;
+      }
+      if (!permissions.documentAssembly) {
+        permissionFlags.documentAssembly = false;
+      }
+
+      // Apply encryption with password and permissions
+      pdfDoc.encrypt({
+        userPassword: password,
+        ownerPassword: password + '_owner_key', // Different owner password for administrative access
+        permissions: permissionFlags
+      });
+    }
+
+    return pdfDoc.save();
+  }
+
   createDownloadLink(pdfBytes: Uint8Array, fileName: string): string {
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
     return URL.createObjectURL(blob);
