@@ -379,36 +379,50 @@ export class PdfProcessor {
     return new Blob([pdfBytes], { type: 'application/pdf' });
   }
 
-  async splitPdf(file: File, ranges: { start: number; end: number }[]): Promise<Uint8Array[]> {
+  async splitPdf(file: File, pages: number[]): Promise<Uint8Array[]> {
     const arrayBuffer = await file.arrayBuffer();
     const pdfDoc = await PDFDocument.load(arrayBuffer);
     const totalPages = pdfDoc.getPageCount();
 
     const splitPdfs: Uint8Array[] = [];
+    const validPages = pages.filter(p => p > 0 && p <= totalPages);
 
-    for (const range of ranges) {
-      const newPdf = await PDFDocument.create();
-      const pageIndices: number[] = [];
-      for (let i = range.start; i <= range.end; i++) {
-        // pdf-lib pages are 0-indexed, but user input is 1-indexed
-        if (i > 0 && i <= totalPages) {
-          pageIndices.push(i - 1);
-        }
-      }
-
-      if (pageIndices.length > 0) {
-        const copiedPages = await newPdf.copyPages(pdfDoc, pageIndices);
-        copiedPages.forEach((page) => newPdf.addPage(page));
-        const pdfBytes = await newPdf.save();
-        splitPdfs.push(pdfBytes);
-      }
+    if (validPages.length === 0 && pages.length > 0) {
+      throw new Error("Invalid page ranges provided. No pages were split.");
     }
 
-    if (splitPdfs.length === 0 && ranges.length > 0) {
-        throw new Error("Invalid page ranges provided. No pages were split.");
+    for (const pageNum of validPages) {
+      const newPdf = await PDFDocument.create();
+      const [copiedPage] = await newPdf.copyPages(pdfDoc, [pageNum - 1]);
+      newPdf.addPage(copiedPage);
+      const pdfBytes = await newPdf.save();
+      splitPdfs.push(pdfBytes);
     }
 
     return splitPdfs;
+  }
+
+  async protectPdf(file: File, password: string): Promise<Uint8Array> {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(arrayBuffer);
+
+    const pdfBytes = await pdfDoc.save({
+      encrypt: {
+        userPassword: password,
+        ownerPassword: password, // Or a different owner password
+        permissions: {
+          printing: 'high',
+          modifying: false,
+          copying: false,
+          annotating: false,
+          fillingForms: false,
+          contentAccessibility: false,
+          documentAssembly: false,
+        },
+      },
+    });
+
+    return pdfBytes;
   }
 
   async compressPdf(file: File, options?: { imageQuality: number, compressionLevel: string, preserveMetadata: boolean, optimizeForWeb: boolean }): Promise<Uint8Array> {

@@ -125,19 +125,19 @@ const SplitPdfPage = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      let ranges: { start: number; end: number; }[] = [];
+      let pages: number[] = [];
       
       if (splitType === "range") {
-        ranges = parsePageRanges(pageRanges, fileInfo.pages);
+        pages = parsePageRanges(pageRanges);
       } else if (splitType === "pages") {
-        ranges = selectedPages.map(page => ({ start: page, end: page }));
+        pages = selectedPages;
       } else if (splitType === "every") {
-        for (let i = 1; i <= fileInfo.pages; i++) {
-          ranges.push({ start: i, end: i });
+        if (fileInfo) {
+          pages = Array.from({ length: fileInfo.pages }, (_, i) => i + 1);
         }
       }
 
-      const results = await pdfProcessor.splitPdf(file, ranges);
+      const results = await pdfProcessor.splitPdf(file, pages);
       
       const splitFiles = results.map((data, index) => ({
         name: `split-${index + 1}-${file.name}`,
