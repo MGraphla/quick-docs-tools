@@ -264,22 +264,22 @@ const ExcelToPdfPage = () => {
   const totalSize = files.reduce((sum, file) => sum + file.file.size, 0);
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-6 md:space-y-8 max-w-6xl mx-auto p-4">
       {/* Header */}
       <div className="text-center">
         <div className="inline-flex items-center bg-teal-100 text-teal-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
           <FileSpreadsheet className="h-4 w-4 mr-2" />
           Excel to PDF Converter
         </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Excel to PDF</h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Excel to PDF</h1>
+        <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
           Convert Microsoft Excel spreadsheets to professional PDF files with preserved formatting, tables, and formulas.
         </p>
       </div>
 
       {/* Upload Area */}
       <Card className="border-2 border-dashed border-gray-300 hover:border-teal-400 transition-all duration-300">
-        <CardContent className="p-8">
+        <CardContent className="p-6 sm:p-8">
           <div
             className={`text-center transition-all duration-300 cursor-pointer ${
               dragOver ? 'scale-105 bg-teal-50' : ''
@@ -294,10 +294,10 @@ const ExcelToPdfPage = () => {
                 <Upload className="h-10 w-10 text-white" />
               </div>
             </div>
-            <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+            <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
               Drop Excel files here or click to browse
             </h3>
-            <p className="text-gray-600 mb-6 text-lg">
+            <p className="text-base sm:text-lg text-gray-600 mb-6">
               Convert .xls and .xlsx files to professional PDF format
             </p>
             <Button size="lg" className="bg-gradient-to-r from-teal-600 to-green-600 hover:from-teal-700 hover:to-green-700">
@@ -425,7 +425,7 @@ const ExcelToPdfPage = () => {
       {files.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <FileSpreadsheet className="h-5 w-5" />
@@ -435,7 +435,7 @@ const ExcelToPdfPage = () => {
                   Total size: {formatFileSize(totalSize)}
                 </CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={clearAll}>
+              <Button variant="outline" size="sm" onClick={clearAll} className="self-end sm:self-auto">
                 Clear All
               </Button>
             </div>
@@ -445,28 +445,30 @@ const ExcelToPdfPage = () => {
               {files.map((file, index) => (
                 <div
                   key={file.id}
-                  className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                  className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
                 >
-                  <div className="flex items-center justify-center w-12 h-12 bg-teal-100 rounded-lg">
-                    <FileSpreadsheet className="h-6 w-6 text-teal-600" />
+                  <div className="flex items-start sm:items-center gap-4 w-full">
+                    <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 bg-teal-100 rounded-lg">
+                      <FileSpreadsheet className="h-6 w-6 text-teal-600" />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant="secondary" className="text-xs flex-shrink-0">
+                          #{index + 1}
+                        </Badge>
+                        <h4 className="font-medium text-gray-900 break-all">
+                          {file.file.name}
+                        </h4>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                        <span>{file.size}</span>
+                        <span>{new Date(file.file.lastModified).toLocaleDateString()}</span>
+                      </div>
+                    </div>
                   </div>
                   
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="secondary" className="text-xs">
-                        #{index + 1}
-                      </Badge>
-                      <h4 className="font-medium text-gray-900 truncate">
-                        {file.file.name}
-                      </h4>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>{file.size}</span>
-                      <span>{new Date(file.file.lastModified).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-2 self-end sm:self-center mt-2 sm:mt-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -511,7 +513,7 @@ const ExcelToPdfPage = () => {
       {convertedFiles.length > 0 && (
         <Card className="border-green-200 bg-green-50">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <CheckCircle className="h-5 w-5 text-green-600" />
@@ -521,49 +523,43 @@ const ExcelToPdfPage = () => {
                   Your Excel files have been converted to PDF format
                 </CardDescription>
               </div>
-              {convertedFiles.length > 1 && (
-                <Button onClick={downloadAll} className="bg-green-600 hover:bg-green-700">
+              <div className="flex gap-2 self-end sm:self-auto">
+                <Button onClick={downloadAll} size="sm">
                   <Download className="h-4 w-4 mr-2" />
                   Download All
                 </Button>
-              )}
+                <Button variant="outline" onClick={clearAll} size="sm">
+                  Clear All
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {convertedFiles.map((file, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm group">
-                  <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-lg">
-                    <FileText className="h-5 w-5 text-red-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="secondary" className="text-xs">
-                        PDF
-                      </Badge>
-                      <h4 className="font-medium text-gray-900 truncate">
-                        {file.name}
-                      </h4>
+            <div className="space-y-4">
+              {convertedFiles.map((file) => (
+                <div key={file.name} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-white rounded-lg shadow-sm">
+                  <div className="flex items-start sm:items-center gap-4 w-full">
+                    <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 bg-red-100 rounded-lg">
+                      <FileText className="h-6 w-6 text-red-600" />
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>{file.pages} page{file.pages > 1 ? 's' : ''}</span>
-                      <span>{file.size}</span>
-                      <span className="text-green-600 font-medium">
-                        {Math.round((file.originalSize - parseInt(file.size.replace(/[^\d]/g, ''))) / file.originalSize * 100)}% smaller
-                      </span>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-gray-900 break-all">{file.name}</h4>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                        <span>{file.pages} page{file.pages > 1 ? 's' : ''}</span>
+                        <span>{file.size}</span>
+                        <Badge variant="outline" className="text-green-600 border-green-200">
+                          {Math.round(100 - (parseInt(file.size) / file.originalSize) * 100)}% smaller
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm">
+                  <div className="flex items-center gap-2 self-end sm:self-center mt-2 sm:mt-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => downloadFile(file)}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
+                    <Button variant="outline" size="sm" onClick={() => downloadFile(file)}>
+                      <Download className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Download</span>
                     </Button>
                   </div>
                 </div>

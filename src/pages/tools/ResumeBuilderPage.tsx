@@ -190,496 +190,377 @@ const ResumeBuilderPage = () => {
     }
 
     setIsGenerating(true);
-    
+
     try {
-      // Create new PDF document
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
       });
-      
-      // Set font
-      doc.setFont('helvetica');
-      
-      // Define colors
+
       const primaryColor = color;
       const textColor = '#333333';
       const lightColor = '#777777';
-      
-      // Page dimensions
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 15;
-      
-      if (template === 'modern') {
-        // Modern template
-        
-        // Header with name and title
+      let currentY = margin;
+
+      const checkPageBreak = (requiredHeight: number) => {
+        if (currentY + requiredHeight >= pageHeight - margin) {
+          doc.addPage();
+          currentY = margin;
+          return true; // Page break occurred
+        }
+        return false;
+      };
+
+      // Helper to draw text and handle page breaks
+      const drawText = (text: string, x: number, y: number, options: any) => {
+        const maxWidth = options.maxWidth || pageWidth - margin - x;
+        const lines = doc.splitTextToSize(text, maxWidth);
+        const lineHeight = doc.getLineHeight(options.font) / doc.internal.scaleFactor;
+
+        lines.forEach((line: string) => {
+          checkPageBreak(lineHeight);
+          doc.text(line, x, currentY);
+          currentY += lineHeight;
+        });
+      };
+
+
+      // --- DRAWING FUNCTIONS ---
+
+      const drawHeader = () => {
         doc.setFillColor(primaryColor);
         doc.rect(0, 0, pageWidth, 40, 'F');
-        
         doc.setTextColor('#ffffff');
         doc.setFontSize(24);
         doc.text(resumeData.personalInfo.fullName, margin, 20);
-        
         doc.setFontSize(14);
         doc.text(resumeData.personalInfo.jobTitle, margin, 30);
-        
-        // Contact information
+        currentY = 45;
+      };
+
+      const drawContactInfo = () => {
         doc.setTextColor(textColor);
         doc.setFontSize(10);
-        let contactY = 50;
-        
+        let contactX = margin;
         if (resumeData.personalInfo.email) {
-          doc.text(`Email: ${resumeData.personalInfo.email}`, margin, contactY);
-          contactY += 6;
+          doc.text(`Email: ${resumeData.personalInfo.email}`, contactX, currentY);
+          currentY += 6;
         }
-        
         if (resumeData.personalInfo.phone) {
-          doc.text(`Phone: ${resumeData.personalInfo.phone}`, margin, contactY);
-          contactY += 6;
+          doc.text(`Phone: ${resumeData.personalInfo.phone}`, contactX, currentY);
+          currentY += 6;
         }
-        
         if (resumeData.personalInfo.location) {
-          doc.text(`Location: ${resumeData.personalInfo.location}`, margin, contactY);
-          contactY += 6;
+          doc.text(`Location: ${resumeData.personalInfo.location}`, contactX, currentY);
+          currentY += 6;
         }
-        
         if (resumeData.personalInfo.website) {
-          doc.text(`Website: ${resumeData.personalInfo.website}`, margin, contactY);
-          contactY += 6;
+          doc.text(`Website: ${resumeData.personalInfo.website}`, contactX, currentY);
+          currentY += 6;
         }
-        
-        // Summary
+      };
+
+      const drawSectionTitle = (title: string) => {
+        currentY += 5;
+        checkPageBreak(12);
+        doc.setFontSize(14);
+        doc.setTextColor(primaryColor);
+        doc.text(title, margin, currentY);
+        currentY += 8;
+        doc.setDrawColor(primaryColor);
+        doc.line(margin, currentY - 4, pageWidth - margin, currentY - 4);
+      };
+
+      const drawSummary = () => {
         if (resumeData.personalInfo.summary) {
-          contactY += 4;
-          doc.setFontSize(14);
-          doc.setTextColor(primaryColor);
-          doc.text('Professional Summary', margin, contactY);
-          contactY += 6;
-          
+          drawSectionTitle('Professional Summary');
           doc.setFontSize(10);
           doc.setTextColor(textColor);
-          
-          // Split summary into lines
-          const summaryLines = doc.splitTextToSize(resumeData.personalInfo.summary, pageWidth - (margin * 2));
-          doc.text(summaryLines, margin, contactY);
-          contactY += (summaryLines.length * 5) + 10;
+          drawText(resumeData.personalInfo.summary, margin, currentY, { });
         }
-        
-        // Experience
+      };
+
+      const drawExperience = () => {
         if (resumeData.experience.length > 0) {
-          doc.setFontSize(14);
-          doc.setTextColor(primaryColor);
-          doc.text('Work Experience', margin, contactY);
-          contactY += 6;
-          
+          drawSectionTitle('Work Experience');
           resumeData.experience.forEach(exp => {
+            checkPageBreak(20);
             doc.setFontSize(12);
             doc.setTextColor(textColor);
-            doc.text(exp.position, margin, contactY);
-            contactY += 5;
-            
+            doc.text(exp.position, margin, currentY);
+            currentY += 6;
+
             doc.setFontSize(11);
             doc.setTextColor(primaryColor);
-            doc.text(exp.company, margin, contactY);
-            contactY += 5;
-            
+            doc.text(exp.company, margin, currentY);
+            currentY += 6;
+
             doc.setFontSize(10);
             doc.setTextColor(lightColor);
-            const dateText = exp.current 
-              ? `${exp.startDate} - Present` 
-              : `${exp.startDate} - ${exp.endDate}`;
-            doc.text(dateText, margin, contactY);
-            contactY += 5;
-            
+            const dateText = exp.current ? `${exp.startDate} - Present` : `${exp.startDate} - ${exp.endDate}`;
+            doc.text(dateText, margin, currentY);
+            currentY += 6;
+
             if (exp.description) {
               doc.setTextColor(textColor);
-              const descLines = doc.splitTextToSize(exp.description, pageWidth - (margin * 2));
-              doc.text(descLines, margin, contactY);
-              contactY += (descLines.length * 5) + 5;
+              drawText(exp.description, margin, currentY, {});
             }
-            
-            contactY += 5;
+            currentY += 8;
           });
         }
-        
-        // Education
+      };
+
+      const drawEducation = () => {
         if (resumeData.education.length > 0) {
-          doc.setFontSize(14);
-          doc.setTextColor(primaryColor);
-          doc.text('Education', margin, contactY);
-          contactY += 6;
-          
+          drawSectionTitle('Education');
           resumeData.education.forEach(edu => {
+            checkPageBreak(20);
             doc.setFontSize(12);
             doc.setTextColor(textColor);
-            doc.text(edu.degree, margin, contactY);
-            contactY += 5;
-            
+            doc.text(edu.degree, margin, currentY);
+            currentY += 6;
+
             doc.setFontSize(11);
             doc.setTextColor(primaryColor);
-            doc.text(edu.institution, margin, contactY);
-            contactY += 5;
-            
+            doc.text(edu.institution, margin, currentY);
+            currentY += 6;
+
             doc.setFontSize(10);
             doc.setTextColor(lightColor);
-            doc.text(`${edu.startDate} - ${edu.endDate}`, margin, contactY);
-            contactY += 5;
-            
+            doc.text(`${edu.startDate} - ${edu.endDate}`, margin, currentY);
+            currentY += 6;
+
             if (edu.description) {
               doc.setTextColor(textColor);
-              const descLines = doc.splitTextToSize(edu.description, pageWidth - (margin * 2));
-              doc.text(descLines, margin, contactY);
-              contactY += (descLines.length * 5) + 5;
+              drawText(edu.description, margin, currentY, {});
             }
-            
-            contactY += 5;
+            currentY += 8;
           });
         }
-        
-        // Skills
+      };
+
+      const drawSkills = () => {
         if (resumeData.skills.length > 0) {
-          doc.setFontSize(14);
-          doc.setTextColor(primaryColor);
-          doc.text('Skills', margin, contactY);
-          contactY += 6;
-          
+          drawSectionTitle('Skills');
           doc.setFontSize(10);
           doc.setTextColor(textColor);
-          
+
           const skillsPerRow = 2;
           const skillWidth = (pageWidth - (margin * 2)) / skillsPerRow;
-          
+
           for (let i = 0; i < resumeData.skills.length; i += skillsPerRow) {
+            checkPageBreak(8);
+            let tempY = currentY;
             for (let j = 0; j < skillsPerRow; j++) {
               const index = i + j;
               if (index < resumeData.skills.length) {
                 const skill = resumeData.skills[index];
                 const skillX = margin + (j * skillWidth);
-                
-                doc.text(skill.name, skillX, contactY);
-                
-                // Draw skill level
-                const levelWidth = 30;
+                doc.text(skill.name, skillX, tempY);
+
                 const dotRadius = 1;
-                const dotSpacing = 7;
-                
+                const dotSpacing = 3;
+                const dotStartX = skillX + 30;
                 for (let k = 0; k < 5; k++) {
-                  const dotX = skillX + 40 + (k * dotSpacing);
-                  if (k < skill.level) {
-                    doc.setFillColor(primaryColor);
-                  } else {
-                    doc.setFillColor(lightColor);
-                  }
-                  doc.circle(dotX, contactY - 1, dotRadius, 'F');
+                  const dotX = dotStartX + (k * dotSpacing);
+                  doc.setFillColor(k < skill.level ? primaryColor : '#d1d5db');
+                  doc.circle(dotX, tempY - 1.5, dotRadius, 'F');
                 }
               }
             }
-            contactY += 8;
+            currentY += 8;
           }
         }
-        
-      } else if (template === 'classic') {
-        // Classic template
-        
-        // Header
-        doc.setFontSize(24);
-        doc.setTextColor(primaryColor);
-        doc.text(resumeData.personalInfo.fullName, pageWidth / 2, 20, { align: 'center' });
-        
-        doc.setFontSize(14);
-        doc.text(resumeData.personalInfo.jobTitle, pageWidth / 2, 30, { align: 'center' });
-        
-        // Contact information
+      };
+
+      // --- TEMPLATE-SPECIFIC DRAWING LOGIC ---
+
+      const drawClassicTemplate = () => {
+        // Classic Header
+        doc.setFontSize(26);
+        doc.setTextColor(textColor);
+        doc.text(resumeData.personalInfo.fullName, pageWidth / 2, currentY, { align: 'center' });
+        currentY += 10;
+
+        doc.setFontSize(12);
+        doc.setTextColor(lightColor);
+        doc.text(resumeData.personalInfo.jobTitle, pageWidth / 2, currentY, { align: 'center' });
+        currentY += 8;
+
+        // Contact Info
+        const contactInfo = [resumeData.personalInfo.email, resumeData.personalInfo.phone, resumeData.personalInfo.location, resumeData.personalInfo.website].filter(Boolean).join(' | ');
         doc.setFontSize(10);
         doc.setTextColor(textColor);
-        let contactText = '';
-        
-        if (resumeData.personalInfo.email) contactText += resumeData.personalInfo.email;
-        if (resumeData.personalInfo.phone) {
-          if (contactText) contactText += ' | ';
-          contactText += resumeData.personalInfo.phone;
-        }
-        if (resumeData.personalInfo.location) {
-          if (contactText) contactText += ' | ';
-          contactText += resumeData.personalInfo.location;
-        }
-        if (resumeData.personalInfo.website) {
-          if (contactText) contactText += ' | ';
-          contactText += resumeData.personalInfo.website;
-        }
-        
-        doc.text(contactText, pageWidth / 2, 40, { align: 'center' });
-        
-        // Divider
-        doc.setDrawColor(primaryColor);
-        doc.setLineWidth(0.5);
-        doc.line(margin, 45, pageWidth - margin, 45);
-        
-        let currentY = 55;
-        
-        // Summary
-        if (resumeData.personalInfo.summary) {
-          doc.setFontSize(12);
-          doc.setTextColor(primaryColor);
-          doc.text('PROFESSIONAL SUMMARY', margin, currentY);
-          currentY += 6;
-          
-          doc.setFontSize(10);
-          doc.setTextColor(textColor);
-          const summaryLines = doc.splitTextToSize(resumeData.personalInfo.summary, pageWidth - (margin * 2));
-          doc.text(summaryLines, margin, currentY);
-          currentY += (summaryLines.length * 5) + 10;
-        }
-        
-        // Experience
-        if (resumeData.experience.length > 0) {
-          doc.setFontSize(12);
-          doc.setTextColor(primaryColor);
-          doc.text('WORK EXPERIENCE', margin, currentY);
-          currentY += 6;
-          
-          resumeData.experience.forEach(exp => {
-            doc.setFontSize(11);
-            doc.setTextColor(textColor);
-            doc.text(exp.position, margin, currentY);
-            
-            const dateText = exp.current 
-              ? `${exp.startDate} - Present` 
-              : `${exp.startDate} - ${exp.endDate}`;
-            
-            const dateWidth = doc.getTextWidth(dateText);
-            doc.text(dateText, pageWidth - margin - dateWidth, currentY);
-            currentY += 5;
-            
-            doc.setFontSize(10);
-            doc.text(`${exp.company}, ${exp.location}`, margin, currentY);
-            currentY += 5;
-            
-            if (exp.description) {
-              const descLines = doc.splitTextToSize(exp.description, pageWidth - (margin * 2));
-              doc.text(descLines, margin, currentY);
-              currentY += (descLines.length * 5);
+        doc.text(contactInfo, pageWidth / 2, currentY, { align: 'center' });
+        currentY += 10;
+
+        // Draw sections
+        drawSummary();
+        drawExperience();
+        drawEducation();
+        drawSkills();
+      };
+
+      const drawCreativeTemplate = () => {
+        const leftColumnX = margin;
+        const rightColumnX = pageWidth * 0.4 + 5;
+        const leftColumnWidth = pageWidth * 0.4 - margin * 2;
+        const rightColumnWidth = pageWidth * 0.6 - margin - 5;
+        let leftY = margin;
+        let rightY = margin;
+
+        const addPageForCreative = () => {
+          doc.addPage();
+          leftY = margin;
+          rightY = margin;
+          doc.setFillColor(primaryColor);
+          doc.rect(0, 0, pageWidth * 0.4, pageHeight, 'F');
+        };
+
+        const checkCreativePageBreak = (requiredHeight: number, column: 'left' | 'right') => {
+          const currentY = column === 'left' ? leftY : rightY;
+          if (currentY + requiredHeight >= pageHeight - margin) {
+            addPageForCreative();
+            return true;
+          }
+          return false;
+        };
+
+        const drawCreativeText = (text: string, x: number, options: { maxWidth: number; column: 'left' | 'right' }) => {
+          const lines = doc.splitTextToSize(text, options.maxWidth);
+          const lineHeight = doc.getLineHeight() / doc.internal.scaleFactor;
+          let currentY = options.column === 'left' ? leftY : rightY;
+
+          lines.forEach((line: string) => {
+            if (checkCreativePageBreak(lineHeight, options.column)) {
+              currentY = options.column === 'left' ? leftY : rightY;
             }
-            
-            currentY += 8;
+            doc.text(line, x, currentY);
+            currentY += lineHeight;
           });
-        }
-        
-        // Education
-        if (resumeData.education.length > 0) {
-          doc.setFontSize(12);
-          doc.setTextColor(primaryColor);
-          doc.text('EDUCATION', margin, currentY);
-          currentY += 6;
-          
-          resumeData.education.forEach(edu => {
-            doc.setFontSize(11);
-            doc.setTextColor(textColor);
-            doc.text(edu.degree, margin, currentY);
-            
-            const dateText = `${edu.startDate} - ${edu.endDate}`;
-            const dateWidth = doc.getTextWidth(dateText);
-            doc.text(dateText, pageWidth - margin - dateWidth, currentY);
-            currentY += 5;
-            
-            doc.setFontSize(10);
-            doc.text(edu.institution, margin, currentY);
-            currentY += 5;
-            
-            if (edu.description) {
-              const descLines = doc.splitTextToSize(edu.description, pageWidth - (margin * 2));
-              doc.text(descLines, margin, currentY);
-              currentY += (descLines.length * 5);
-            }
-            
-            currentY += 8;
-          });
-        }
-        
-        // Skills
-        if (resumeData.skills.length > 0) {
-          doc.setFontSize(12);
-          doc.setTextColor(primaryColor);
-          doc.text('SKILLS', margin, currentY);
-          currentY += 6;
-          
-          doc.setFontSize(10);
-          doc.setTextColor(textColor);
-          
-          const skillsText = resumeData.skills.map(skill => skill.name).join(' • ');
-          const skillsLines = doc.splitTextToSize(skillsText, pageWidth - (margin * 2));
-          doc.text(skillsLines, margin, currentY);
-        }
-        
-      } else if (template === 'creative') {
-        // Creative template
-        
-        // Sidebar
+
+          if (options.column === 'left') {
+            leftY = currentY;
+          } else {
+            rightY = currentY;
+          }
+        };
+
+        // Initial page with sidebar
         doc.setFillColor(primaryColor);
-        doc.rect(0, 0, 60, pageHeight, 'F');
-        
-        // Name and title
+        doc.rect(0, 0, pageWidth * 0.4, pageHeight, 'F');
+
+        // --- Left Column ---
         doc.setTextColor('#ffffff');
-        doc.setFontSize(18);
-        doc.text(resumeData.personalInfo.fullName, 30, 30, { align: 'center' });
-        
-        doc.setFontSize(12);
-        const titleLines = doc.splitTextToSize(resumeData.personalInfo.jobTitle, 50);
-        doc.text(titleLines, 30, 45, { align: 'center' });
-        
-        // Contact info in sidebar
-        let sidebarY = 70;
-        doc.setFontSize(9);
-        
-        if (resumeData.personalInfo.email) {
-          doc.text('Email', 10, sidebarY);
-          doc.text(resumeData.personalInfo.email, 10, sidebarY + 5);
-          sidebarY += 15;
-        }
-        
-        if (resumeData.personalInfo.phone) {
-          doc.text('Phone', 10, sidebarY);
-          doc.text(resumeData.personalInfo.phone, 10, sidebarY + 5);
-          sidebarY += 15;
-        }
-        
-        if (resumeData.personalInfo.location) {
-          doc.text('Location', 10, sidebarY);
-          doc.text(resumeData.personalInfo.location, 10, sidebarY + 5);
-          sidebarY += 15;
-        }
-        
-        if (resumeData.personalInfo.website) {
-          doc.text('Website', 10, sidebarY);
-          doc.text(resumeData.personalInfo.website, 10, sidebarY + 5);
-          sidebarY += 15;
-        }
-        
-        // Skills in sidebar
-        if (resumeData.skills.length > 0) {
-          sidebarY += 10;
-          doc.text('SKILLS', 10, sidebarY);
-          sidebarY += 8;
-          
-          resumeData.skills.forEach(skill => {
-            doc.text(skill.name, 10, sidebarY);
-            
-            // Skill level dots
-            for (let i = 0; i < 5; i++) {
-              const dotX = 10 + (i * 4);
-              if (i < skill.level) {
-                doc.setFillColor('#ffffff');
-              } else {
-                doc.setFillColor('#aaaaaa');
-              }
-              doc.circle(dotX, sidebarY + 5, 1, 'F');
-            }
-            
-            sidebarY += 12;
-          });
-        }
-        
-        // Main content
-        const contentX = 70;
-        let contentY = 30;
-        
-        // Summary
-        if (resumeData.personalInfo.summary) {
-          doc.setTextColor(primaryColor);
-          doc.setFontSize(14);
-          doc.text('ABOUT ME', contentX, contentY);
-          contentY += 8;
-          
-          doc.setTextColor(textColor);
-          doc.setFontSize(10);
-          const summaryLines = doc.splitTextToSize(resumeData.personalInfo.summary, pageWidth - contentX - margin);
-          doc.text(summaryLines, contentX, contentY);
-          contentY += (summaryLines.length * 5) + 15;
-        }
-        
-        // Experience
-        if (resumeData.experience.length > 0) {
-          doc.setTextColor(primaryColor);
-          doc.setFontSize(14);
-          doc.text('EXPERIENCE', contentX, contentY);
-          contentY += 8;
-          
-          resumeData.experience.forEach(exp => {
-            doc.setFontSize(12);
-            doc.setTextColor(textColor);
-            doc.text(exp.position, contentX, contentY);
-            contentY += 5;
-            
-            doc.setFontSize(10);
-            doc.setTextColor(primaryColor);
-            doc.text(exp.company, contentX, contentY);
-            
-            const dateText = exp.current 
-              ? `${exp.startDate} - Present` 
-              : `${exp.startDate} - ${exp.endDate}`;
-            
-            const dateWidth = doc.getTextWidth(dateText);
-            doc.text(dateText, pageWidth - margin - dateWidth, contentY);
-            contentY += 5;
-            
-            if (exp.description) {
-              doc.setTextColor(textColor);
-              const descLines = doc.splitTextToSize(exp.description, pageWidth - contentX - margin);
-              doc.text(descLines, contentX, contentY);
-              contentY += (descLines.length * 5);
-            }
-            
-            contentY += 10;
-          });
-        }
-        
-        // Education
+        doc.setFontSize(22).setFont(undefined, 'bold');
+        drawCreativeText(resumeData.personalInfo.fullName, leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+        leftY += 2;
+        doc.setFontSize(14).setFont(undefined, 'normal');
+        drawCreativeText(resumeData.personalInfo.jobTitle, leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+        leftY += 10;
+
+        doc.setFontSize(10).setFont(undefined, 'bold');
+        drawCreativeText('Contact', leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+        leftY += 2;
+        doc.setFontSize(10).setFont(undefined, 'normal');
+        if(resumeData.personalInfo.email) drawCreativeText(resumeData.personalInfo.email, leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+        if(resumeData.personalInfo.phone) drawCreativeText(resumeData.personalInfo.phone, leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+        if(resumeData.personalInfo.location) drawCreativeText(resumeData.personalInfo.location, leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+        if(resumeData.personalInfo.website) drawCreativeText(resumeData.personalInfo.website, leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+        leftY += 10;
+
         if (resumeData.education.length > 0) {
-          doc.setTextColor(primaryColor);
-          doc.setFontSize(14);
-          doc.text('EDUCATION', contentX, contentY);
-          contentY += 8;
-          
+          doc.setFontSize(12).setFont(undefined, 'bold');
+          drawCreativeText('Education', leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+          leftY += 2;
           resumeData.education.forEach(edu => {
-            doc.setFontSize(12);
-            doc.setTextColor(textColor);
-            doc.text(edu.degree, contentX, contentY);
-            contentY += 5;
-            
-            doc.setFontSize(10);
-            doc.setTextColor(primaryColor);
-            doc.text(edu.institution, contentX, contentY);
-            
-            const dateText = `${edu.startDate} - ${edu.endDate}`;
-            const dateWidth = doc.getTextWidth(dateText);
-            doc.text(dateText, pageWidth - margin - dateWidth, contentY);
-            contentY += 5;
-            
-            if (edu.description) {
-              doc.setTextColor(textColor);
-              const descLines = doc.splitTextToSize(edu.description, pageWidth - contentX - margin);
-              doc.text(descLines, contentX, contentY);
-              contentY += (descLines.length * 5);
-            }
-            
-            contentY += 10;
+            doc.setFontSize(11).setFont(undefined, 'bold');
+            drawCreativeText(edu.degree, leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+            doc.setFontSize(10).setFont(undefined, 'normal');
+            drawCreativeText(edu.institution, leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+            drawCreativeText(`${edu.startDate} - ${edu.endDate}`, leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+            leftY += 6;
           });
         }
+        leftY += 10;
+
+        if (resumeData.skills.length > 0) {
+          doc.setFontSize(12).setFont(undefined, 'bold');
+          drawCreativeText('Skills', leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+          leftY += 2;
+          doc.setFontSize(10).setFont(undefined, 'normal');
+          resumeData.skills.forEach(skill => {
+            drawCreativeText(skill.name, leftColumnX, { maxWidth: leftColumnWidth, column: 'left' });
+            leftY += 1;
+          });
+        }
+
+        // --- Right Column ---
+        doc.setTextColor(textColor);
+        if (resumeData.personalInfo.summary) {
+          doc.setFontSize(14).setFont(undefined, 'bold');
+          drawCreativeText('Professional Summary', rightColumnX, { maxWidth: rightColumnWidth, column: 'right' });
+          rightY += 2;
+          doc.setFontSize(10).setFont(undefined, 'normal');
+          drawCreativeText(resumeData.personalInfo.summary, rightColumnX, { maxWidth: rightColumnWidth, column: 'right' });
+          rightY += 10;
+        }
+
+        if (resumeData.experience.length > 0) {
+          doc.setFontSize(14).setFont(undefined, 'bold');
+          drawCreativeText('Work Experience', rightColumnX, { maxWidth: rightColumnWidth, column: 'right' });
+          rightY += 2;
+          resumeData.experience.forEach(exp => {
+            doc.setFontSize(12).setFont(undefined, 'bold');
+            drawCreativeText(exp.position, rightColumnX, { maxWidth: rightColumnWidth, column: 'right' });
+            doc.setFontSize(11).setFont(undefined, 'normal');
+            doc.setTextColor(primaryColor);
+            drawCreativeText(exp.company, rightColumnX, { maxWidth: rightColumnWidth, column: 'right' });
+            doc.setTextColor(lightColor);
+            const dateText = exp.current ? `${exp.startDate} - Present` : `${exp.startDate} - ${exp.endDate}`;
+            drawCreativeText(dateText, rightColumnX, { maxWidth: rightColumnWidth, column: 'right' });
+            doc.setTextColor(textColor);
+            if (exp.description) {
+              drawCreativeText(exp.description, rightColumnX, { maxWidth: rightColumnWidth, column: 'right' });
+            }
+            rightY += 8;
+          });
+        }
+      };
+
+
+      // --- GENERATE PDF --- 
+
+      doc.setFont('helvetica');
+
+      if (template === 'modern') {
+        drawHeader();
+        drawContactInfo();
+        drawSummary();
+        drawExperience();
+        drawEducation();
+        drawSkills();
+      } else if (template === 'classic') {
+        drawClassicTemplate();
+      } else if (template === 'creative') {
+        drawCreativeTemplate();
+      } else {
+        doc.text("This template is not yet fully supported.", margin, margin);
       }
-      
-      // Convert to base64 and set state
-      const pdfData = doc.output('datauristring');
-      setGeneratedPdf(pdfData);
-      setIsGenerating(false);
-      toast.success("Resume generated successfully!");
-      
+
+      const pdfOutput = doc.output('datauristring');
+      setGeneratedPdf(pdfOutput);
+      toast.success("PDF generated successfully!");
+
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error("Error generating PDF:", error);
+      toast.error("An unexpected error occurred while generating the PDF.");
+    } finally {
       setIsGenerating(false);
-      toast.error("Failed to generate resume. Please try again.");
     }
   };
 
@@ -1074,7 +955,7 @@ const ResumeBuilderPage = () => {
                 
                 <TabsContent value="skills" className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {resumeData.skills.map((skill, index) => (
+                    {resumeData.skills.map((skill) => (
                       <div key={skill.id} className="flex items-center gap-2">
                         <Input
                           value={skill.name}

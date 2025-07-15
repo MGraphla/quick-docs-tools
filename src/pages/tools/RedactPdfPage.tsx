@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Upload, FileText, Download, Loader2, CheckCircle, AlertCircle, Eye, EyeOff, Search, ZoomIn, ZoomOut, Save, Eraser } from "lucide-react";
+import { Upload, FileText, Download, Loader2, CheckCircle, AlertCircle, Search, ZoomIn, ZoomOut, Eraser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,11 +8,11 @@ import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
+import { formatFileSize } from "@/lib/pdfUtils";
 import * as pdfjsLib from 'pdfjs-dist';
+import { PDFDocument, rgb, ColorType } from 'pdf-lib';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.mjs`;
-import { PDFDocument } from 'pdf-lib';
 
 interface RedactedFile {
   name: string;
@@ -38,7 +38,7 @@ const RedactPdfPage = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number, y: number } | null>(null);
   const [currentRedaction, setCurrentRedaction] = useState<RedactionArea | null>(null);
-  const [zoom, setZoom] = useState([100]);
+  const [zoom, setZoom] = useState(100);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
@@ -48,12 +48,29 @@ const RedactPdfPage = () => {
   const [textMatches, setTextMatches] = useState<RedactionArea[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const pdfProcessor = createPdfProcessor();
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
 
   const generateId = () => Math.random().toString(36).substring(2, 9);
+
+  const resetState = () => {
+    setFile(null);
+    setFileInfo(null);
+    setCurrentPage(1);
+    setPageImage(null);
+    setRedactionAreas([]);
+    setIsDrawing(false);
+    setStartPoint(null);
+    setCurrentRedaction(null);
+    setZoom(100);
+    setProcessing(false);
+    setProgress(0);
+    setProgressMessage("");
+    setRedactedFile(null);
+    setSearchText("");
+    setTextMatches([]);
+    pdfDocRef.current = null;
+  };
 
   const handleFileSelect = useCallback(async (selectedFiles: FileList | null) => {
     if (!selectedFiles || selectedFiles.length === 0) return;
@@ -64,10 +81,10 @@ const RedactPdfPage = () => {
       return;
     }
 
+    resetState();
     const loadingToast = toast.loading("Loading PDF...");
     
     try {
-      // Load PDF using pdf.js
       const arrayBuffer = await selectedFile.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       pdfDocRef.current = pdf;
@@ -77,24 +94,19 @@ const RedactPdfPage = () => {
         size: formatFileSize(selectedFile.size),
         pages: pdf.numPages
       });
-      setRedactedFile(null);
-      setCurrentPage(1);
-      setRedactionAreas([]);
-      setTextMatches([]);
       
-      // Render the first page
-      await renderPage(pdf, 1);
-      
+      await renderPage(pdf, 1, 1);
       toast.success(`PDF loaded: ${pdf.numPages} pages`);
     } catch (error) {
       console.error('Error loading PDF:', error);
       toast.error(error instanceof Error ? error.message : "Failed to load PDF");
+      resetState();
     } finally {
       toast.dismiss(loadingToast);
     }
   }, []);
 
-  const renderPage = async (pdf: pdfjsLib.PDFDocumentProxy, pageNum: number, scale: number = zoom[0] / 100) => {
+  const renderPage = async (pdf: pdfjsLib.PDFDocumentProxy, pageNum: number, scale: number) => {
     try {
       const page = await pdf.getPage(pageNum);
       const viewport = page.getViewport({ scale });
@@ -104,24 +116,23 @@ const RedactPdfPage = () => {
       canvas.height = viewport.height;
       canvas.width = viewport.width;
 
-      await page.render({
-        canvasContext: context,
-        viewport: viewport
-      }).promise;
-
-      setPageImage(canvas.toDataURL('image/jpeg', 0.95));
+      await page.render({ canvasContext: context, viewport }).promise;
+      setPageImage(canvas.toDataURL('image/png'));
     } catch (error) {
       console.error('Error rendering page:', error);
       toast.error("Failed to render PDF page");
     }
   };
 
-  const changePage = async (newPage: number) => {
-    if (!fileInfo || !pdfDocRef.current) return;
-    if (newPage < 1 || newPage > fileInfo.pages) return;
-    
+  useEffect(() => {
+    if (pdfDocRef.current) {
+      renderPage(pdfDocRef.current, currentPage, zoom / 100);
+    }
+  }, [zoom, currentPage]);
+
+  const changePage = (newPage: number) => {
+    if (!fileInfo || newPage < 1 || newPage > fileInfo.pages) return;
     setCurrentPage(newPage);
-    await renderPage(pdfDocRef.current, newPage, zoom[0] / 100);
   };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -143,72 +154,37 @@ const RedactPdfPage = () => {
     handleFileSelect(e.dataTransfer.files);
   }, [handleFileSelect]);
 
+  const getMousePos = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!imageContainerRef.current) return { x: 0, y: 0 };
+    const rect = imageContainerRef.current.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  };
+
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!containerRef.current) return;
-    
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / (zoom[0] / 100);
-    const y = (e.clientY - rect.top) / (zoom[0] / 100);
-    
+    const { x, y } = getMousePos(e);
     setIsDrawing(true);
     setStartPoint({ x, y });
-    
-    const newRedaction: RedactionArea = {
-      id: generateId(),
-      page: currentPage,
-      x,
-      y,
-      width: 0,
-      height: 0
-    };
-    
-    setCurrentRedaction(newRedaction);
+    setCurrentRedaction({ id: generateId(), page: currentPage, x, y, width: 0, height: 0 });
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDrawing || !startPoint || !containerRef.current || !currentRedaction) return;
-    
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / (zoom[0] / 100);
-    const y = (e.clientY - rect.top) / (zoom[0] / 100);
-    
-    const width = x - startPoint.x;
-    const height = y - startPoint.y;
-    
-    setCurrentRedaction({
-      ...currentRedaction,
-      width,
-      height
-    });
+    if (!isDrawing || !startPoint || !currentRedaction) return;
+    const { x, y } = getMousePos(e);
+    setCurrentRedaction({ ...currentRedaction, width: x - startPoint.x, height: y - startPoint.y });
   };
 
   const handleMouseUp = () => {
     if (!isDrawing || !currentRedaction) return;
     
-    // Normalize negative width/height
     let { x, y, width, height } = currentRedaction;
+    if (width < 0) { x += width; width = Math.abs(width); }
+    if (height < 0) { y += height; height = Math.abs(height); }
     
-    if (width < 0) {
-      x += width;
-      width = Math.abs(width);
-    }
-    
-    if (height < 0) {
-      y += height;
-      height = Math.abs(height);
-    }
-    
-    // Only add if the area is big enough
     if (width > 5 && height > 5) {
-      const normalizedRedaction: RedactionArea = {
-        ...currentRedaction,
-        x,
-        y,
-        width,
-        height
-      };
-      
-      setRedactionAreas([...redactionAreas, normalizedRedaction]);
+      setRedactionAreas(prev => [...prev, { ...currentRedaction, x, y, width, height }]);
     }
     
     setIsDrawing(false);
@@ -216,64 +192,38 @@ const RedactPdfPage = () => {
     setCurrentRedaction(null);
   };
 
-  const handleZoomChange = async (newZoom: number[]) => {
-    setZoom(newZoom);
-    if (pdfDocRef.current) {
-      await renderPage(pdfDocRef.current, currentPage, newZoom[0] / 100);
-    }
-  };
-
-  const removeRedactionArea = (id: string) => {
-    setRedactionAreas(redactionAreas.filter(area => area.id !== id));
-  };
-
-  const clearAllRedactions = () => {
-    setRedactionAreas([]);
-    setTextMatches([]);
-    toast.success("All redactions cleared");
-  };
+  const removeRedactionArea = (id: string) => setRedactionAreas(areas => areas.filter(area => area.id !== id));
+  const clearAllRedactions = () => { setRedactionAreas([]); setTextMatches([]); toast.success("All redactions cleared"); };
 
   const searchTextInCurrentPage = async () => {
-    if (!searchText.trim() || !pdfDocRef.current) {
-      toast.error("Please enter text to search");
-      return;
-    }
+    if (!searchText.trim() || !pdfDocRef.current) return toast.error("Please enter text to search");
     
     try {
       const page = await pdfDocRef.current.getPage(currentPage);
       const textContent = await page.getTextContent();
-      const viewport = page.getViewport({ scale: 1.0 });
+      const viewport = page.getViewport({ scale: zoom / 100 });
       
-      // Find text matches
-      const matches: RedactionArea[] = [];
-      
-      for (const item of textContent.items) {
-        const textItem = item as any; // Using any as TextItem is not directly exported
-        if (textItem.str.toLowerCase().includes(searchText.toLowerCase())) {
-          // Get the position and dimensions of the text
-          const tx = textItem.transform;
-          const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]));
-          
-          const match: RedactionArea = {
+      const matches = textContent.items
+        .map(item => item as any)
+        .filter(item => item.str.toLowerCase().includes(searchText.toLowerCase()))
+        .map(item => {
+          const transform = pdfjsLib.Util.transform(viewport.transform, item.transform);
+          return {
             id: generateId(),
             page: currentPage,
-            x: tx[4],
-            y: tx[5] - fontHeight,
-            width: textItem.width,
-            height: fontHeight + 2, // Add a little padding
+            x: transform[4],
+            y: transform[5] - item.height,
+            width: item.width,
+            height: item.height,
           };
-          
-          matches.push(match);
-        }
-      }
-      
+        });
+
       if (matches.length > 0) {
         setTextMatches(matches);
         toast.success(`Found ${matches.length} matches on page ${currentPage}`);
       } else {
         toast.info(`No matches found for "${searchText}" on page ${currentPage}`);
       }
-      
     } catch (error) {
       console.error('Error searching text:', error);
       toast.error("Failed to search text in PDF");
@@ -282,108 +232,64 @@ const RedactPdfPage = () => {
 
   const applyTextMatches = () => {
     if (textMatches.length === 0) return;
-    
-    setRedactionAreas([...redactionAreas, ...textMatches]);
+    setRedactionAreas(prev => [...prev, ...textMatches]);
     setTextMatches([]);
     toast.success("Added text matches to redactions");
   };
 
   const applyRedactions = async () => {
-    if (!file) {
-      toast.error("Please select a PDF file");
-      return;
-    }
-
-    if (redactionAreas.length === 0) {
-      toast.error("Please add at least one redaction area");
-      return;
-    }
+    if (!file || !pdfDocRef.current) return toast.error("Please select a PDF file");
+    if (redactionAreas.length === 0) return toast.error("Please add at least one redaction area");
 
     setProcessing(true);
     setProgress(0);
-    setProgressMessage("Preparing to redact PDF...");
+    setProgressMessage("Applying redactions...");
 
     try {
-      const steps = [
-        { message: "Loading PDF document...", progress: 10 },
-        { message: "Processing redaction areas...", progress: 30 },
-        { message: "Applying redactions...", progress: 50 },
-        { message: "Finalizing document...", progress: 80 }
-      ];
-
-      for (const step of steps) {
-        setProgressMessage(step.message);
-        setProgress(step.progress);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
-      // Load the PDF document
       const arrayBuffer = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
       
-      // Group redactions by page
-      const redactionsByPage: { [key: number]: RedactionArea[] } = {};
-      redactionAreas.forEach(redaction => {
-        if (!redactionsByPage[redaction.page]) {
-          redactionsByPage[redaction.page] = [];
-        }
-        redactionsByPage[redaction.page].push(redaction);
-      });
-      
-      // Apply redactions to each page
-      for (const [pageNum, redactions] of Object.entries(redactionsByPage)) {
-        const pageIndex = parseInt(pageNum) - 1;
-        const page = pdfDoc.getPage(pageIndex);
-        
-        // Get page dimensions
-        const { width, height } = page.getSize();
-        
-        // Draw black rectangles for each redaction area
-        redactions.forEach(redaction => {
-          // Convert coordinates (PDF coordinates start from bottom-left)
-          const x = redaction.x;
-          const y = height - redaction.y - redaction.height;
-          
-          // Draw black rectangle
+      const redactionsByPage = redactionAreas.reduce((acc, area) => {
+        (acc[area.page] = acc[area.page] || []).push(area);
+        return acc;
+      }, {} as Record<number, RedactionArea[]>);
+
+      for (const [pageNumStr, areas] of Object.entries(redactionsByPage)) {
+        const pageNum = parseInt(pageNumStr);
+        const page = pdfDoc.getPage(pageNum - 1);
+        const pdfJsPage = await pdfDocRef.current.getPage(pageNum);
+        const viewport = pdfJsPage.getViewport({ scale: 1.0 });
+        const scale = page.getWidth() / viewport.width;
+
+        areas.forEach(area => {
           page.drawRectangle({
-            x,
-            y,
-            width: redaction.width,
-            height: redaction.height,
-            color: { red: 0, green: 0, blue: 0 },
-            opacity: 1
+            x: area.x * scale,
+            y: page.getHeight() - (area.y + area.height) * scale,
+            width: area.width * scale,
+            height: area.height * scale,
+            color: rgb(0, 0, 0),
           });
         });
       }
       
-      // Save the redacted PDF
       const redactedPdfBytes = await pdfDoc.save();
       const blob = new Blob([redactedPdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       
-      setRedactedFile({
-        name: `redacted-${file.name}`,
-        url,
-        size: formatFileSize(blob.size)
-      });
-      
+      setRedactedFile({ name: `redacted-${file.name}`, url, size: formatFileSize(blob.size) });
       setProgress(100);
-      setProgressMessage("Redaction completed!");
+      setProgressMessage("Redaction complete!");
       toast.success("PDF redacted successfully!");
-      
     } catch (error) {
       console.error('Redaction error:', error);
-      toast.error(error instanceof Error ? error.message : "Failed to redact PDF. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to redact PDF");
     } finally {
       setProcessing(false);
-      setProgress(0);
-      setProgressMessage("");
     }
   };
 
   const downloadRedacted = () => {
     if (!redactedFile) return;
-    
     const link = document.createElement('a');
     link.href = redactedFile.url;
     link.download = redactedFile.name;
@@ -391,376 +297,139 @@ const RedactPdfPage = () => {
     toast.success(`Downloaded ${redactedFile.name}`);
   };
 
-  // Update the page rendering when zoom changes
-  useEffect(() => {
-    if (pdfDocRef.current && currentPage) {
-      renderPage(pdfDocRef.current, currentPage, zoom[0] / 100);
-    }
-  }, [zoom]);
-
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
-      {/* Header */}
+    <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto p-2 sm:p-4">
       <div className="text-center">
         <div className="inline-flex items-center bg-red-100 text-red-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
           <Eraser className="h-4 w-4 mr-2" />
           PDF Redaction Tool
         </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Redact PDF</h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Permanently black out sensitive information in your PDF documents
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Redact PDF</h1>
+        <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto">
+          Permanently black out sensitive information in your PDF documents.
         </p>
       </div>
 
-      {/* Upload Area */}
       {!file && (
         <Card className="border-2 border-dashed border-gray-300 hover:border-red-400 transition-all duration-300">
-          <CardContent className="p-8">
+          <CardContent className="p-6 sm:p-8">
             <div
-              className={`text-center transition-all duration-300 cursor-pointer ${
-                dragOver ? 'scale-105 bg-red-50' : ''
-              }`}
+              className={`text-center transition-all duration-300 cursor-pointer rounded-lg p-4 ${dragOver ? 'scale-105 bg-red-50' : ''}`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
             >
-              <div className="mb-6">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-red-500 to-red-700 rounded-full mb-4 shadow-lg">
-                  <Upload className="h-10 w-10 text-white" />
-                </div>
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-red-500 to-red-700 rounded-full mb-4 shadow-lg">
+                <Upload className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                Drop PDF file here or click to browse
-              </h3>
-              <p className="text-gray-600 mb-6 text-lg">
-                Select a PDF file to redact sensitive information
-              </p>
+              <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">Drop PDF file here or click to browse</h3>
+              <p className="text-gray-600 mb-6 sm:text-lg">Select a PDF file to begin redacting.</p>
               <Button size="lg" className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800">
                 <Upload className="h-5 w-5 mr-2" />
                 Choose PDF File
               </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,application/pdf"
-                onChange={(e) => handleFileSelect(e.target.files)}
-                className="hidden"
-              />
+              <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" onChange={(e) => handleFileSelect(e.target.files)} className="hidden" />
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* PDF Redaction Interface */}
       {file && fileInfo && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left Sidebar - Tools */}
-          <div className="lg:col-span-1 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-4 xl:col-span-3 space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Document Info
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-lg">
-                      <FileText className="h-5 w-5 text-red-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900 truncate">{file.name}</h4>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <span>{fileInfo.pages} pages</span>
-                        <span>•</span>
-                        <span>{fileInfo.size}</span>
-                      </div>
-                    </div>
+              <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Document Info</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 bg-red-100 rounded-lg"><FileText className="h-5 w-5 text-red-600" /></div>
+                  <div className="min-w-0">
+                    <h4 className="font-medium text-gray-900 truncate">{file.name}</h4>
+                    <div className="flex items-center gap-2 text-sm text-gray-500"><span>{fileInfo.pages} pages</span><span>•</span><span>{fileInfo.size}</span></div>
                   </div>
-
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Button variant="outline" size="sm" onClick={() => changePage(currentPage - 1)} disabled={currentPage <= 1}>Previous</Button>
+                  <div className="text-sm">Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{fileInfo.pages}</span></div>
+                  <Button variant="outline" size="sm" onClick={() => changePage(currentPage + 1)} disabled={currentPage >= fileInfo.pages}>Next</Button>
+                </div>
+                <div className="space-y-2">
+                  <Label>Zoom: {zoom}%</Label>
+                  <Slider value={[zoom]} onValueChange={([val]) => setZoom(val)} min={50} max={200} step={10} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Search Text</Label>
+                  <div className="flex gap-2">
+                    <Input placeholder="Enter text to find" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+                    <Button variant="outline" onClick={searchTextInCurrentPage} className="shrink-0"><Search className="h-4 w-4" /></Button>
+                  </div>
+                  {textMatches.length > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <p className="text-green-600">Found {textMatches.length} matches</p>
+                      <Button variant="link" size="sm" onClick={applyTextMatches}>Redact All</Button>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => changePage(currentPage - 1)}
-                      disabled={currentPage <= 1}
-                    >
-                      Previous
-                    </Button>
-                    <div className="text-sm">
-                      Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{fileInfo.pages}</span>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => changePage(currentPage + 1)}
-                      disabled={currentPage >= fileInfo.pages}
-                    >
-                      Next
-                    </Button>
+                    <Label>Redactions: {redactionAreas.length}</Label>
+                    {redactionAreas.length > 0 && <Button variant="link" size="sm" onClick={clearAllRedactions} className="text-red-600">Clear All</Button>}
                   </div>
-
-                  <div className="space-y-2">
-                    <Label>Zoom: {zoom[0]}%</Label>
-                    <Slider
-                      value={zoom}
-                      onValueChange={handleZoomChange}
-                      min={50}
-                      max={200}
-                      step={10}
-                    />
-                    <div className="flex justify-between">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleZoomChange([Math.max(50, zoom[0] - 10)])}
-                        className="w-10 h-10 p-0"
-                      >
-                        <ZoomOut className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleZoomChange([100])}
-                        className="text-xs"
-                      >
-                        Reset
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleZoomChange([Math.min(200, zoom[0] + 10)])}
-                        className="w-10 h-10 p-0"
-                      >
-                        <ZoomIn className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Search Text</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Enter text to find"
-                        value={searchText}
-                        onChange={(e) => setSearchText(e.target.value)}
-                      />
-                      <Button 
-                        variant="outline" 
-                        onClick={searchTextInCurrentPage}
-                        className="shrink-0"
-                      >
-                        <Search className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {textMatches.length > 0 && (
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-green-600">
-                          Found {textMatches.length} matches
-                        </p>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={applyTextMatches}
-                        >
-                          Redact All
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Redaction Areas: {redactionAreas.filter(r => r.page === currentPage).length}</Label>
-                      {redactionAreas.length > 0 && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={clearAllRedactions}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          Clear All
-                        </Button>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Click and drag on the document to create redaction areas
-                    </p>
-                  </div>
+                  <p className="text-xs text-gray-500">Click and drag on the document to create redaction areas.</p>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Redacted File */}
             {redactedFile && (
               <Card className="border-green-200 bg-green-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-green-800 mb-1">
-                        PDF Redacted Successfully!
-                      </h3>
-                      <p className="text-green-700 mb-2">{redactedFile.name}</p>
-                      <p className="text-sm text-green-600">
-                        Sensitive information has been permanently redacted
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={downloadRedacted}
-                    className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Redacted PDF
-                  </Button>
+                <CardHeader><CardTitle className="flex items-center gap-2 text-green-700"><CheckCircle className="h-5 w-5"/>Redaction Complete</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-green-600">Sensitive information has been permanently redacted.</p>
+                  <Button onClick={downloadRedacted} className="w-full bg-green-600 hover:bg-green-700"><Download className="h-4 w-4 mr-2" />Download PDF</Button>
                 </CardContent>
               </Card>
             )}
           </div>
 
-          {/* Main Content - PDF Viewer */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="lg:col-span-8 xl:col-span-9 space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>PDF Redaction</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={applyRedactions}
-                      disabled={processing || redactionAreas.length === 0}
-                      className="bg-red-600 hover:bg-red-700 text-white hover:text-white border-red-600 hover:border-red-700"
-                    >
-                      <Eraser className="h-4 w-4 mr-1" />
-                      Apply Redactions
-                    </Button>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div>
+                    <CardTitle>PDF Viewer</CardTitle>
+                    <CardDescription className="mt-1">Redact sensitive information by drawing boxes over it.</CardDescription>
                   </div>
+                  <Button onClick={applyRedactions} disabled={processing || redactionAreas.length === 0} className="bg-red-600 hover:bg-red-700 text-white self-end sm:self-center">
+                    {processing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eraser className="h-4 w-4 mr-2" />}Apply Redactions
+                  </Button>
                 </div>
-                <CardDescription>
-                  Click and drag to select areas to redact. Selected areas will be permanently blacked out.
-                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div 
-                  className="bg-gray-100 p-4 rounded-lg flex items-center justify-center overflow-auto"
-                  style={{ maxHeight: '700px' }}
-                >
-                  <div 
-                    ref={containerRef}
-                    className="relative bg-white shadow-lg rounded-lg overflow-hidden cursor-crosshair"
-                    style={{ 
-                      transform: `scale(${zoom[0] / 100})`,
-                      transformOrigin: 'top left',
-                      transition: 'transform 0.2s ease-in-out'
-                    }}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                  >
+                <div className="bg-gray-100 p-2 sm:p-4 rounded-lg flex items-center justify-center overflow-auto" style={{ minHeight: '60vh' }}>
+                  <div ref={imageContainerRef} className="relative shadow-lg cursor-crosshair" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
                     {pageImage ? (
                       <>
-                        <img 
-                          src={pageImage} 
-                          alt={`Page ${currentPage}`}
-                          className="w-full h-full object-contain"
-                        />
-                        
-                        {/* Redaction Areas */}
-                        {redactionAreas
-                          .filter(area => area.page === currentPage)
-                          .map(area => (
-                            <div
-                              key={area.id}
-                              className="absolute bg-black border-2 border-red-500 cursor-pointer"
-                              style={{
-                                left: `${area.x}px`,
-                                top: `${area.y}px`,
-                                width: `${area.width}px`,
-                                height: `${area.height}px`,
-                              }}
-                              onClick={() => removeRedactionArea(area.id)}
-                              title="Click to remove"
-                            />
-                          ))
-                        }
-                        
-                        {/* Text Search Matches */}
-                        {textMatches.map(match => (
-                          <div
-                            key={match.id}
-                            className="absolute bg-yellow-200 opacity-50 border-2 border-yellow-500 cursor-pointer"
-                            style={{
-                              left: `${match.x}px`,
-                              top: `${match.y}px`,
-                              width: `${match.width}px`,
-                              height: `${match.height}px`,
-                            }}
-                            onClick={() => {
-                              setRedactionAreas([...redactionAreas, match]);
-                              setTextMatches(textMatches.filter(m => m.id !== match.id));
-                            }}
-                            title="Click to add to redactions"
-                          />
+                        <img src={pageImage} alt={`Page ${currentPage}`} className="block select-none" />
+                        {redactionAreas.filter(a => a.page === currentPage).map(area => (
+                          <div key={area.id} onClick={() => removeRedactionArea(area.id)} className="absolute bg-black border-2 border-red-500 cursor-pointer" style={{ left: area.x, top: area.y, width: area.width, height: area.height }} />
                         ))}
-                        
-                        {/* Current Redaction */}
+                        {textMatches.map(match => (
+                          <div key={match.id} className="absolute bg-yellow-400/50 border border-yellow-600" style={{ left: match.x, top: match.y, width: match.width, height: match.height }} />
+                        ))}
                         {isDrawing && currentRedaction && (
-                          <div
-                            className="absolute bg-red-500 opacity-50"
-                            style={{
-                              left: `${Math.min(startPoint!.x, startPoint!.x + currentRedaction.width)}px`,
-                              top: `${Math.min(startPoint!.y, startPoint!.y + currentRedaction.height)}px`,
-                              width: `${Math.abs(currentRedaction.width)}px`,
-                              height: `${Math.abs(currentRedaction.height)}px`,
-                            }}
-                          />
+                          <div className="absolute bg-black/70" style={{ left: Math.min(startPoint!.x, currentRedaction.x + currentRedaction.width), top: Math.min(startPoint!.y, currentRedaction.y + currentRedaction.height), width: Math.abs(currentRedaction.width), height: Math.abs(currentRedaction.height) }} />
                         )}
                       </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                      </div>
+                      <div className="flex items-center justify-center text-gray-400 p-10 h-60"><Loader2 className="h-8 w-8 animate-spin" /></div>
                     )}
                   </div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Processing Progress */}
-            {processing && (
-              <Card>
-                <CardContent className="p-6">
-                  <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
-                      <Loader2 className="h-8 w-8 text-red-600 animate-spin" />
-                    </div>
-                    <h3 className="text-lg font-semibold mb-2">Redacting PDF</h3>
-                    <p className="text-gray-600 mb-4">
-                      {progressMessage || "Applying redactions to your document..."}
-                    </p>
-                    <div className="max-w-md mx-auto">
-                      <div className="flex justify-between text-sm mb-2">
-                        <span>Progress</span>
-                        <span>{progress}%</span>
-                      </div>
-                      <Progress value={progress} className="h-2" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         </div>
       )}
 
-      {/* Help Section */}
       {!file && (
         <Alert>
           <AlertCircle className="h-4 w-4" />

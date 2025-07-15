@@ -377,22 +377,24 @@ const MergePdfPage = () => {
       {mergedFileUrl && mergedFileName && (
         <Card className="border-green-200 bg-green-50">
           <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-              <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-green-800 mb-1">
-                  Merge Completed Successfully!
-                </h3>
-                <p className="text-green-700 mb-2">{mergedFileName}</p>
-                <p className="text-sm text-green-600">
-                  Combined {files.length} PDF files • {totalPages} total pages • {formatFileSize(totalSize)}
-                </p>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 bg-green-100 rounded-full">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-green-800 mb-1">
+                    Merge Completed Successfully!
+                  </h3>
+                  <p className="text-green-700 mb-2">{mergedFileName}</p>
+                  <p className="text-sm text-green-600">
+                    Combined {files.length} PDF files • {totalPages} total pages • {formatFileSize(totalSize)}
+                  </p>
+                </div>
               </div>
               <Button
                 onClick={downloadMerged}
-                className="bg-green-600 hover:bg-green-700 text-white w-full md:w-auto"
+                className="bg-green-600 hover:bg-green-700 text-white w-full md:w-auto flex-shrink-0"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download Merged PDF

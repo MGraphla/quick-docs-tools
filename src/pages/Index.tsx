@@ -26,7 +26,12 @@ import {
   Sparkles,
   FileSpreadsheet,
   Presentation,
-  Minimize2
+  Minimize2,
+  FileEdit,
+  ClipboardList,
+  Calendar,
+  Receipt,
+  EyeOff
 } from "lucide-react";
 import AuthModal from "@/components/auth/AuthModal";
 
@@ -168,6 +173,14 @@ const Index = () => {
       bgColor: "bg-red-50",
       iconColor: "text-red-600"
     },
+    { 
+      name: "Redact PDF", 
+      description: "Permanently remove sensitive content from PDFs", 
+      icon: EyeOff,
+      color: "from-gray-500 to-gray-600",
+      bgColor: "bg-gray-50",
+      iconColor: "text-gray-600"
+    },
   ];
 
   const additionalTools = [
@@ -203,6 +216,46 @@ const Index = () => {
       bgColor: "bg-gradient-to-br from-orange-50 to-red-50",
       iconColor: "text-orange-600"
     },
+    { 
+      name: "Text Editor", 
+      description: "A simple and elegant text editor for your notes", 
+      icon: FileEdit,
+      color: "from-sky-500 to-sky-600",
+      bgColor: "bg-gradient-to-br from-sky-50 to-cyan-50",
+      iconColor: "text-sky-600"
+    },
+    { 
+      name: "Resume Builder", 
+      description: "Build a professional resume in minutes", 
+      icon: ClipboardList,
+      color: "from-fuchsia-500 to-fuchsia-600",
+      bgColor: "bg-gradient-to-br from-fuchsia-50 to-purple-50",
+      iconColor: "text-fuchsia-600"
+    },
+    { 
+      name: "Audio Trimmer", 
+      description: "Trim and cut audio files with ease", 
+      icon: Scissors,
+      color: "from-amber-500 to-amber-600",
+      bgColor: "bg-gradient-to-br from-amber-50 to-yellow-50",
+      iconColor: "text-amber-600"
+    },
+    { 
+      name: "Calendar Generator", 
+      description: "Create and customize printable calendars", 
+      icon: Calendar,
+      color: "from-rose-500 to-rose-600",
+      bgColor: "bg-gradient-to-br from-rose-50 to-red-50",
+      iconColor: "text-rose-600"
+    },
+    { 
+      name: "Invoice Generator", 
+      description: "Generate professional invoices for your business", 
+      icon: Receipt,
+      color: "from-lime-500 to-lime-600",
+      bgColor: "bg-gradient-to-br from-lime-50 to-green-50",
+      iconColor: "text-lime-600"
+    },
   ];
 
   const features = [
@@ -212,12 +265,7 @@ const Index = () => {
     "Enterprise-Grade Security"
   ];
 
-  const stats = [
-    { number: "50,000+", label: "Happy Users", icon: Users },
-    { number: "1M+", label: "Files Processed", icon: FileText },
-    { number: "99.9%", label: "Uptime", icon: Clock },
-    { number: "25+", label: "Tools Available", icon: Zap }
-  ];
+
 
   const openAuthModal = (mode: 'signin' | 'signup') => {
     setAuthMode(mode);
@@ -293,15 +341,9 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Enhanced Hero Section */}
-      <section id="home" className="container mx-auto px-4 py-20 relative z-10">
+{/* Enhanced Hero Section */}
+<section id="home" className="container mx-auto px-4 py-20 relative z-10">
         <div className="text-center max-w-6xl mx-auto animate-fade-in">
-          <div className="inline-flex items-center bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 px-6 py-3 rounded-full text-sm font-semibold mb-8 animate-bounce shadow-lg">
-            <Star className="h-4 w-4 mr-2 text-yellow-500" />
-            Trusted by 50,000+ professionals worldwide
-            <Sparkles className="h-4 w-4 ml-2 text-purple-500" />
-          </div>
-          
           <h1 className="text-4xl sm:text-6xl md:text-8xl font-bold text-gray-900 mb-8 leading-tight">
             Complete 
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 animate-pulse"> PDF</span> & 
@@ -350,17 +392,13 @@ const Index = () => {
             ))}
           </div>
 
-          {/* Enhanced Stats Section */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mt-20">
-            {stats.map((stat, index) => (
-              <div key={index} className="text-center group hover:scale-105 transition-all duration-300">
-                <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300">
-                  <stat.icon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
-                </div>
-                <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-2">{stat.number}</div>
-                <div className="text-xs sm:text-sm font-medium text-gray-600">{stat.label}</div>
-              </div>
-            ))}
+          {/* Startup Banner */}
+          <div className="mt-20 text-center">
+            <div className="inline-flex items-center bg-gradient-to-r from-green-100 via-yellow-50 to-green-100 text-gray-800 px-8 py-4 rounded-full text-lg font-semibold shadow-lg border-2 border-green-200">
+                <Sparkles className="h-5 w-5 mr-3 text-yellow-500 animate-pulse" />
+                <p>This is a startup looking for investors. Built by young Cameroonians, fully working!</p>
+                <Sparkles className="h-5 w-5 ml-3 text-yellow-500 animate-pulse" />
+            </div>
           </div>
         </div>
       </section>

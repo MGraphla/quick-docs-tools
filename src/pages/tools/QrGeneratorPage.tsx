@@ -181,30 +181,30 @@ END:VCARD`;
             </CardHeader>
             <CardContent className="space-y-6">
               <Tabs value={qrType} onValueChange={setQrType} className="w-full">
-                <TabsList className="grid grid-cols-3 md:grid-cols-6 mb-4">
-                  <TabsTrigger value="url" className="flex items-center gap-1">
-                    <Link className="h-4 w-4" />
-                    <span className="hidden md:inline">URL</span>
+                <TabsList className="flex flex-wrap h-auto justify-start -m-1 mb-4">
+                  <TabsTrigger value="url" className="flex-grow basis-1/4 m-1 flex flex-col items-center gap-1 p-2">
+                    <Link className="h-5 w-5" />
+                    <span className="text-xs">URL</span>
                   </TabsTrigger>
-                  <TabsTrigger value="email" className="flex items-center gap-1">
-                    <Mail className="h-4 w-4" />
-                    <span className="hidden md:inline">Email</span>
+                  <TabsTrigger value="email" className="flex-grow basis-1/4 m-1 flex flex-col items-center gap-1 p-2">
+                    <Mail className="h-5 w-5" />
+                    <span className="text-xs">Email</span>
                   </TabsTrigger>
-                  <TabsTrigger value="phone" className="flex items-center gap-1">
-                    <Phone className="h-4 w-4" />
-                    <span className="hidden md:inline">Phone</span>
+                  <TabsTrigger value="phone" className="flex-grow basis-1/4 m-1 flex flex-col items-center gap-1 p-2">
+                    <Phone className="h-5 w-5" />
+                    <span className="text-xs">Phone</span>
                   </TabsTrigger>
-                  <TabsTrigger value="sms" className="flex items-center gap-1">
-                    <Smartphone className="h-4 w-4" />
-                    <span className="hidden md:inline">SMS</span>
+                  <TabsTrigger value="sms" className="flex-grow basis-1/4 m-1 flex flex-col items-center gap-1 p-2">
+                    <Smartphone className="h-5 w-5" />
+                    <span className="text-xs">SMS</span>
                   </TabsTrigger>
-                  <TabsTrigger value="wifi" className="flex items-center gap-1">
-                    <Zap className="h-4 w-4" />
-                    <span className="hidden md:inline">WiFi</span>
+                  <TabsTrigger value="wifi" className="flex-grow basis-1/4 m-1 flex flex-col items-center gap-1 p-2">
+                    <Zap className="h-5 w-5" />
+                    <span className="text-xs">WiFi</span>
                   </TabsTrigger>
-                  <TabsTrigger value="vcard" className="flex items-center gap-1">
-                    <QrCode className="h-4 w-4" />
-                    <span className="hidden md:inline">vCard</span>
+                  <TabsTrigger value="vcard" className="flex-grow basis-1/4 m-1 flex flex-col items-center gap-1 p-2">
+                    <QrCode className="h-5 w-5" />
+                    <span className="text-xs">vCard</span>
                   </TabsTrigger>
                 </TabsList>
                 

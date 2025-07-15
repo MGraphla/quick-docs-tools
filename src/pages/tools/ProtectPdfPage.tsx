@@ -10,7 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { createPdfProcessor, formatFileSize } from "@/lib/pdfUtils";
+import { formatFileSize } from "@/lib/pdfUtils";
+import ConvertApi from 'convertapi-js'
 
 interface ProtectedFile {
   name: string;
@@ -43,7 +44,6 @@ const ProtectPdfPage = () => {
   const [protectedFile, setProtectedFile] = useState<ProtectedFile | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pdfProcessor = createPdfProcessor();
 
   const handleFileSelect = useCallback(async (selectedFiles: FileList | null) => {
     if (!selectedFiles || selectedFiles.length === 0) return;
@@ -57,20 +57,20 @@ const ProtectPdfPage = () => {
     const loadingToast = toast.loading("Loading PDF...");
     
     try {
-      const info = await pdfProcessor.loadPdf(selectedFile);
+      // We don't need to load the PDF fully on the client side anymore
+      // But we can still show some basic info
       setFile(selectedFile);
       setFileInfo({
         size: formatFileSize(selectedFile.size),
-        pages: info.pageCount
+        pages: 0 // Page count is unknown without full parsing
       });
       
-      // Set default target filename
       const originalName = selectedFile.name;
       const nameWithoutExt = originalName.replace(/\.pdf$/i, '');
       setTargetFilename(`${nameWithoutExt}-protected.pdf`);
       
       setProtectedFile(null);
-      toast.success(`PDF loaded: ${info.pageCount} pages`);
+      toast.success(`PDF selected: ${selectedFile.name}`);
     } catch (error) {
       console.error('Error loading PDF:', error);
       toast.error(error instanceof Error ? error.message : "Failed to load PDF");
@@ -132,18 +132,12 @@ const ProtectPdfPage = () => {
         toast.error("Please enter a password");
         return;
       }
-
       if (password !== confirmPassword) {
         toast.error("Passwords do not match");
         return;
       }
-
-      if (password.length < 6) {
-        toast.error("Password must be at least 6 characters long");
-        return;
-      }
     }
-    
+
     if (!targetFilename) {
       toast.error("Please enter a target filename");
       return;
@@ -151,44 +145,43 @@ const ProtectPdfPage = () => {
 
     setProcessing(true);
     setProgress(0);
-    setProgressMessage("Preparing to protect document...");
+    setProgressMessage("Uploading file to ConvertAPI...");
+
+    const loadingToast = toast.loading("Protecting your PDF...");
 
     try {
-      const steps = [
-        { message: "Loading PDF document...", progress: 15 },
-        { message: "Setting up encryption...", progress: 30 },
-        { message: "Applying security settings...", progress: 50 },
-        { message: "Configuring permissions...", progress: 70 },
-        { message: "Finalizing protected PDF...", progress: 90 }
-      ];
+      const convertApi = ConvertApi.auth(import.meta.env.VITE_CONVERTAPI_SECRET);
+      const params = convertApi.createParams();
+      params.add('File', file);
+      params.add('UserPassword', password);
+      // Note: ConvertAPI handles permissions differently. We are focusing on password protection as requested.
+      // For more advanced permissions, the API parameters would need to be extended.
 
-      for (const step of steps) {
-        setProgressMessage(step.message);
-        setProgress(step.progress);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+      setProgress(30);
+      setProgressMessage("File uploaded, starting protection process...");
 
-      // Use the actual PDF protection method
-      const protectedPdfBytes = await pdfProcessor.protectPdf(file, password, permissions);
-      
-      // Create a blob and URL for download
-      const blob = new Blob([protectedPdfBytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
+      const result = await convertApi.convert('pdf', 'protect', params);
+
+      setProgress(80);
+      setProgressMessage("Finalizing protected file...");
+
+      const fileInfo = result.files[0];
       
       setProtectedFile({
-        name: targetFilename,
-        url: url,
-        size: formatFileSize(blob.size)
+        name: targetFilename, // Use user-defined filename
+        url: fileInfo.Url, // Use the URL from ConvertAPI
+        size: formatFileSize(fileInfo.FileSize)
       });
-      
+
       setProgress(100);
       setProgressMessage("Protection completed!");
-      toast.success("PDF protected successfully with password!");
-      
+      toast.success("PDF protected successfully!");
+
     } catch (error) {
-      console.error('Protection error:', error);
-      toast.error(error instanceof Error ? error.message : "Failed to protect PDF. Please try again.");
+      console.error('ConvertAPI Error:', error);
+      toast.error("Failed to protect PDF. Please check your API key and try again.");
     } finally {
+      toast.dismiss(loadingToast);
       setProcessing(false);
       setProgress(0);
       setProgressMessage("");
@@ -307,7 +300,7 @@ const ProtectPdfPage = () => {
                     <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-lg">
                       <FileText className="h-5 w-5 text-red-600" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h4 className="font-medium text-gray-900 truncate">{file.name}</h4>
                       <div className="flex items-center gap-2 text-sm text-gray-500">
                         <span>{fileInfo.pages} pages</span>

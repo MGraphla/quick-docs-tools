@@ -234,29 +234,26 @@ const InvoiceGeneratorPage = () => {
           doc.setFontSize(9);
           doc.setTextColor(textColor);
           if (invoiceData.businessInfo.address) {
-            doc.text(invoiceData.businessInfo.address, businessInfoX, businessInfoY);
+            const addressLines = doc.splitTextToSize(invoiceData.businessInfo.address, 80);
+            doc.text(addressLines, businessInfoX, businessInfoY);
+            businessInfoY += (addressLines.length * 4);
+          }
+
+          if (invoiceData.businessInfo.phone) {
+            doc.text(`Phone: ${invoiceData.businessInfo.phone}`, businessInfoX, businessInfoY);
             businessInfoY += 5;
           }
-          
-          let contactLine = '';
-          if (invoiceData.businessInfo.phone) contactLine += `Phone: ${invoiceData.businessInfo.phone}`;
           if (invoiceData.businessInfo.email) {
-            if (contactLine) contactLine += ' | ';
-            contactLine += `Email: ${invoiceData.businessInfo.email}`;
-          }
-          
-          if (contactLine) {
-            doc.text(contactLine, businessInfoX, businessInfoY);
+            doc.text(`Email: ${invoiceData.businessInfo.email}`, businessInfoX, businessInfoY);
             businessInfoY += 5;
           }
-          
           if (invoiceData.businessInfo.website) {
             doc.text(`Website: ${invoiceData.businessInfo.website}`, businessInfoX, businessInfoY);
             businessInfoY += 5;
           }
-          
           if (invoiceData.businessInfo.taxId) {
             doc.text(`Tax ID: ${invoiceData.businessInfo.taxId}`, businessInfoX, businessInfoY);
+            businessInfoY += 5;
           }
         } else {
           // No logo, center business info
@@ -268,29 +265,26 @@ const InvoiceGeneratorPage = () => {
           doc.setFontSize(9);
           doc.setTextColor(textColor);
           if (invoiceData.businessInfo.address) {
-            doc.text(invoiceData.businessInfo.address, pageWidth / 2, businessInfoY, { align: 'center' });
+            const addressLines = doc.splitTextToSize(invoiceData.businessInfo.address, 80);
+            doc.text(addressLines, pageWidth / 2, businessInfoY, { align: 'center' });
+            businessInfoY += (addressLines.length * 4);
+          }
+
+          if (invoiceData.businessInfo.phone) {
+            doc.text(`Phone: ${invoiceData.businessInfo.phone}`, pageWidth / 2, businessInfoY, { align: 'center' });
             businessInfoY += 5;
           }
-          
-          let contactLine = '';
-          if (invoiceData.businessInfo.phone) contactLine += `Phone: ${invoiceData.businessInfo.phone}`;
           if (invoiceData.businessInfo.email) {
-            if (contactLine) contactLine += ' | ';
-            contactLine += `Email: ${invoiceData.businessInfo.email}`;
-          }
-          
-          if (contactLine) {
-            doc.text(contactLine, pageWidth / 2, businessInfoY, { align: 'center' });
+            doc.text(`Email: ${invoiceData.businessInfo.email}`, pageWidth / 2, businessInfoY, { align: 'center' });
             businessInfoY += 5;
           }
-          
           if (invoiceData.businessInfo.website) {
             doc.text(`Website: ${invoiceData.businessInfo.website}`, pageWidth / 2, businessInfoY, { align: 'center' });
             businessInfoY += 5;
           }
-          
           if (invoiceData.businessInfo.taxId) {
             doc.text(`Tax ID: ${invoiceData.businessInfo.taxId}`, pageWidth / 2, businessInfoY, { align: 'center' });
+            businessInfoY += 5;
           }
         }
         
@@ -305,19 +299,21 @@ const InvoiceGeneratorPage = () => {
         doc.text('INVOICE', pageWidth / 2, invoiceHeaderY + 8, { align: 'center' });
         
         // Invoice details
-        const detailsY = invoiceHeaderY + 20;
+        let detailsY = invoiceHeaderY + 20;
         
         doc.setFontSize(10);
         doc.setTextColor(textColor);
         
         doc.text('Invoice Number:', margin, detailsY);
         doc.text(invoiceData.invoiceNumber, margin + 35, detailsY);
+        detailsY += 7;
         
-        doc.text('Date:', margin, detailsY + 7);
-        doc.text(formatDate(invoiceData.invoiceDate), margin + 35, detailsY + 7);
+        doc.text('Date:', margin, detailsY);
+        doc.text(formatDate(invoiceData.invoiceDate), margin + 35, detailsY);
+        detailsY += 7;
         
-        doc.text('Due Date:', margin, detailsY + 14);
-        doc.text(formatDate(invoiceData.dueDate), margin + 35, detailsY + 14);
+        doc.text('Due Date:', margin, detailsY);
+        doc.text(formatDate(invoiceData.dueDate), margin + 35, detailsY);
         
         // Client info
         const clientY = detailsY;
@@ -396,7 +392,6 @@ const InvoiceGeneratorPage = () => {
         // Notes and payment terms
         if (invoiceData.notes) {
           doc.setFontSize(10);
-          doc.setTextColor(textColor);
           doc.text('Notes:', margin, finalY);
           
           const notesLines = doc.splitTextToSize(invoiceData.notes, pageWidth - (margin * 2));
@@ -439,33 +434,27 @@ const InvoiceGeneratorPage = () => {
         doc.setFontSize(12);
         doc.setTextColor(textColor);
         doc.text(invoiceData.businessInfo.name, margin, businessInfoY);
-        businessInfoY += 5;
-        
-        doc.setFontSize(9);
+        businessInfoY += 6;
         if (invoiceData.businessInfo.address) {
-          doc.text(invoiceData.businessInfo.address, margin, businessInfoY);
-          businessInfoY += 5;
+            const addressLines = doc.splitTextToSize(invoiceData.businessInfo.address, 80);
+            doc.text(addressLines, margin, businessInfoY);
+            businessInfoY += (addressLines.length * 4);
         }
-        
-        let contactLine = '';
-        if (invoiceData.businessInfo.phone) contactLine += `Phone: ${invoiceData.businessInfo.phone}`;
+        if (invoiceData.businessInfo.phone) {
+            doc.text(`Phone: ${invoiceData.businessInfo.phone}`, margin, businessInfoY);
+            businessInfoY += 5;
+        }
         if (invoiceData.businessInfo.email) {
-          if (contactLine) contactLine += ' | ';
-          contactLine += `Email: ${invoiceData.businessInfo.email}`;
+            doc.text(`Email: ${invoiceData.businessInfo.email}`, margin, businessInfoY);
+            businessInfoY += 5;
         }
-        
-        if (contactLine) {
-          doc.text(contactLine, margin, businessInfoY);
-          businessInfoY += 5;
-        }
-        
         if (invoiceData.businessInfo.website) {
-          doc.text(`Website: ${invoiceData.businessInfo.website}`, margin, businessInfoY);
-          businessInfoY += 5;
+            doc.text(`Website: ${invoiceData.businessInfo.website}`, margin, businessInfoY);
+            businessInfoY += 5;
         }
-        
         if (invoiceData.businessInfo.taxId) {
-          doc.text(`Tax ID: ${invoiceData.businessInfo.taxId}`, margin, businessInfoY);
+            doc.text(`Tax ID: ${invoiceData.businessInfo.taxId}`, margin, businessInfoY);
+            businessInfoY += 5;
         }
         
         // Invoice details
