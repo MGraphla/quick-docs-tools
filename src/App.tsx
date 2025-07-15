@@ -33,6 +33,9 @@ import RedactPdfPage from "./pages/tools/RedactPdfPage";
 import AudioTrimmerPage from "./pages/tools/AudioTrimmerPage";
 import CalendarGeneratorPage from "./pages/tools/CalendarGeneratorPage";
 import InvoiceGeneratorPage from "./pages/tools/InvoiceGeneratorPage";
+import MergePdfInfoPage from "./pages/tools/MergePdfInfoPage";
+import SplitPdfInfoPage from "./pages/tools/SplitPdfInfoPage";
+import CompressPdfInfoPage from "./pages/tools/CompressPdfInfoPage";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +75,12 @@ const App = () => (
           <Route path="/dashboard/audio-trimmer" element={<Dashboard><AudioTrimmerPage /></Dashboard>} />
           <Route path="/dashboard/calendar-generator" element={<Dashboard><CalendarGeneratorPage /></Dashboard>} />
           <Route path="/dashboard/invoice-generator" element={<Dashboard><InvoiceGeneratorPage /></Dashboard>} />
+          
+          {/* Tool Info Landing Pages */}
+          <Route path="/tools/merge-pdf" element={<MergePdfInfoPage />} />
+          <Route path="/tools/split-pdf" element={<SplitPdfInfoPage />} />
+          <Route path="/tools/compress-pdf" element={<CompressPdfInfoPage />} />
+          
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
