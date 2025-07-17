@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { 
   FileText, 
   Scissors, 
@@ -31,13 +33,18 @@ import {
   ClipboardList,
   Calendar,
   Receipt,
-  EyeOff
+  EyeOff,
+  ChevronDown,
+  Menu,
+  X
 } from "lucide-react";
 import AuthModal from "@/components/auth/AuthModal";
 
 const Index = () => {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [toolsInfoOpen, setToolsInfoOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   const pdfTools = [
@@ -305,44 +312,183 @@ const Index = () => {
               </div>
             </div>
 
-            {/* Navigation Links */}
+            {/* Desktop Navigation Links */}
             <div className="hidden md:flex items-center space-x-8">
               <a href="#home" className="text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:scale-105 text-blue-600 font-semibold">
                 Home
               </a>
-              <a href="#tools" className="text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:scale-105 text-gray-700">
-                Tools
+              <div className="relative">
+                <button 
+                  onClick={() => setToolsInfoOpen(!toolsInfoOpen)}
+                  onBlur={() => setTimeout(() => setToolsInfoOpen(false), 150)}
+                  className="flex items-center text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:scale-105 text-gray-700"
+                >
+                  Tool Info
+                  <ChevronDown className={`h-4 w-4 ml-1 transition-transform duration-200 ${toolsInfoOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {toolsInfoOpen && (
+                  <div className="absolute top-full mt-2 w-64 bg-white rounded-md shadow-lg z-50 border max-h-96 overflow-y-auto">
+                    {/* PDF Tools Section */}
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50 border-b">
+                      PDF Tools
+                    </div>
+                    {pdfTools.map(tool => (
+                      <Link key={tool.name} to={`/info/${tool.name.toLowerCase().replace(/ /g, '-')}`} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100">
+                        {tool.name} Info
+                      </Link>
+                    ))}
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50 border-b">
+                      Productivity Tools
+                    </div>
+                    {additionalTools.map(tool => (
+                      <Link key={tool.name} to={`/info/${tool.name.toLowerCase().replace(/ /g, '-')}`} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100">
+                        {tool.name} Info
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <a href="#features" className="text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:scale-105 text-gray-700">
+                Features
               </a>
-              <a href="#" className="text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:scale-105 text-gray-700">
+              <a href="#about" className="text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:scale-105 text-gray-700">
                 About
               </a>
-              <a href="#" className="text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:scale-105 text-gray-700">
+              <a href="#contact" className="text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:scale-105 text-gray-700">
                 Contact
               </a>
             </div>
 
-            {/* Auth Buttons */}
-            <div className="flex items-center space-x-4">
-              <Button 
-                variant="ghost" 
-                onClick={() => openAuthModal('signin')}
-                className="hover:scale-105 transition-all duration-300 hover:bg-blue-50 text-gray-700 hover:text-blue-600 font-medium"
-              >
+            {/* Desktop Action Buttons */}
+            <div className="hidden md:flex items-center space-x-4">
+              <Button variant="ghost" onClick={() => openAuthModal('signin')} className="text-sm font-medium transition-all duration-300 hover:text-blue-600 hover:bg-blue-50">
                 Sign In
               </Button>
-              <Button 
-                onClick={() => openAuthModal('signup')}
-                className="hover:scale-105 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl font-medium"
-              >
+              <Button onClick={() => openAuthModal('signup')} className="text-sm font-medium bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg hover:scale-105 transition-all duration-300">
                 Get Started
               </Button>
+            </div>
+
+            {/* Mobile Menu Button */}
+            <div className="md:hidden flex items-center">
+              <button onClick={() => setMobileMenuOpen(true)} className="p-2 rounded-md text-gray-700 hover:bg-gray-100">
+                <Menu className="h-6 w-6" />
+              </button>
             </div>
           </nav>
         </div>
       </header>
 
-{/* Enhanced Hero Section */}
-<section id="home" className="container mx-auto px-4 py-20 relative z-10">
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className="fixed inset-0 z-[100] bg-gradient-to-br from-white via-blue-50/50 to-purple-50/50 backdrop-blur-lg"
+        >
+          <div className="container mx-auto px-4 h-full flex flex-col">
+            <div className="flex justify-between items-center py-4 border-b border-gray-200/50 shrink-0">
+              <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
+                    <FileText className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">QuickDocs</span>
+                  </div>
+                </div>
+              <motion.button 
+                whileHover={{ scale: 1.1, rotate: 90 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setMobileMenuOpen(false)} className="p-2 rounded-full text-gray-700 hover:bg-gray-200/70 transition-colors">
+                <X className="h-6 w-6" />
+              </motion.button>
+            </div>
+            <div className="mt-8 px-2 flex-grow overflow-y-auto pb-32">
+              <motion.nav 
+                className="flex flex-col space-y-2"
+                initial="hidden"
+                animate="visible"
+                variants={{ 
+                  visible: { transition: { staggerChildren: 0.07 } },
+                  hidden: {}
+                }}
+              >
+                {[ 
+                  { href: "#home", label: "Home" },
+                  { href: "#features", label: "Features" },
+                ].map((item, i) => (
+                  <motion.a 
+                    key={i}
+                    href={item.href} 
+                    onClick={() => setMobileMenuOpen(false)} 
+                    className="text-xl font-semibold text-gray-800 hover:text-blue-600 p-4 rounded-lg hover:bg-white/70 transition-colors duration-200"
+                    variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }}
+                  >
+                    {item.label}
+                  </motion.a>
+                ))}
+                
+                <motion.div variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }}>
+                  <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="item-1" className="border-b-0">
+                      <AccordionTrigger className="text-xl font-semibold text-gray-800 hover:text-blue-600 p-4 rounded-lg hover:bg-white/70 transition-colors no-underline hover:no-underline">
+                        Tool Info
+                      </AccordionTrigger>
+                      <AccordionContent className="pl-6 pr-2 pb-2">
+                        <div className="flex flex-col space-y-1 mt-1 border-l-2 border-blue-200">
+                          <h4 className="px-4 pt-2 pb-1 text-base font-bold text-blue-800/80">PDF Tools</h4>
+                          {pdfTools.map(tool => (
+                            <Link key={tool.name} to={`/info/${tool.name.toLowerCase().replace(/ /g, '-')}`} onClick={() => setMobileMenuOpen(false)} className="block pl-4 pr-2 py-2.5 text-lg text-gray-700 hover:bg-blue-100/50 hover:text-blue-700 rounded-r-lg transition-all duration-200 font-medium">
+                              {tool.name}
+                            </Link>
+                          ))}
+                          <h4 className="px-4 pt-4 pb-1 text-base font-bold text-purple-800/80">Productivity Tools</h4>
+                          {additionalTools.map(tool => (
+                            <Link key={tool.name} to={`/info/${tool.name.toLowerCase().replace(/ /g, '-')}`} onClick={() => setMobileMenuOpen(false)} className="block pl-4 pr-2 py-2.5 text-lg text-gray-700 hover:bg-purple-100/50 hover:text-purple-700 rounded-r-lg transition-all duration-200 font-medium">
+                              {tool.name}
+                            </Link>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </motion.div>
+
+                {[ 
+                  { href: "#about", label: "About" },
+                  { href: "#contact", label: "Contact" },
+                ].map((item, i) => (
+                  <motion.a 
+                    key={i}
+                    href={item.href} 
+                    onClick={() => setMobileMenuOpen(false)} 
+                    className="text-xl font-semibold text-gray-800 hover:text-blue-600 p-4 rounded-lg hover:bg-white/70 transition-colors duration-200"
+                    variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }}
+                  >
+                    {item.label}
+                  </motion.a>
+                ))}
+              </motion.nav>
+            </div>
+            <motion.div 
+              className="absolute bottom-0 left-0 right-0 p-4 bg-white/50 backdrop-blur-sm border-t border-gray-200/60"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              transition={{ duration: 0.4, ease: 'easeOut', delay: 0.3 }}
+            >
+              <div className="flex items-center space-x-3">
+                  <Button variant="ghost" onClick={() => { openAuthModal('signin'); setMobileMenuOpen(false); }} className="text-lg font-bold w-full py-6 text-blue-600 hover:text-blue-700 hover:bg-blue-100/50 transition-colors duration-200">Sign In</Button>
+                  <Button onClick={() => { openAuthModal('signup'); setMobileMenuOpen(false); }} className="text-lg font-bold bg-gradient-to-r from-blue-500 to-purple-600 text-white w-full py-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">Get Started</Button>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Enhanced Hero Section */}
+      <section id="home" className="container mx-auto px-4 py-20 relative z-10">
         <div className="text-center max-w-6xl mx-auto animate-fade-in">
           <h1 className="text-4xl sm:text-6xl md:text-8xl font-bold text-gray-900 mb-8 leading-tight">
             Complete 

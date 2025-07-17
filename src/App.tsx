@@ -33,6 +33,32 @@ import RedactPdfPage from "./pages/tools/RedactPdfPage";
 import AudioTrimmerPage from "./pages/tools/AudioTrimmerPage";
 import CalendarGeneratorPage from "./pages/tools/CalendarGeneratorPage";
 import InvoiceGeneratorPage from "./pages/tools/InvoiceGeneratorPage";
+import MergePdfInfoPage from "./pages/tool-info/MergePdfInfoPage";
+import RotatePdfInfoPage from './pages/tool-info/RotatePdfInfoPage';
+import ProtectPdfInfoPage from './pages/tool-info/ProtectPdfInfoPage';
+import RedactPdfInfoPage from './pages/tool-info/RedactPdfInfoPage';
+import AudioToTextInfoPage from './pages/tool-info/AudioToTextInfoPage';
+import LiveTranscriptionInfoPage from './pages/tool-info/LiveTranscriptionInfoPage';
+import TextEditorInfoPage from './pages/tool-info/TextEditorInfoPage';
+import ResumeBuilderInfoPage from './pages/tool-info/ResumeBuilderInfoPage';
+import AudioTrimmerInfoPage from './pages/tool-info/AudioTrimmerInfoPage';
+import CalendarGeneratorInfoPage from './pages/tool-info/CalendarGeneratorInfoPage';
+import InvoiceGeneratorInfoPage from './pages/tool-info/InvoiceGeneratorInfoPage';
+import CompressPdfInfoPage from "./pages/tool-info/CompressPdfInfoPage";
+import SplitPdfInfoPage from "./pages/tool-info/SplitPdfInfoPage";
+import PdfToWordInfoPage from "./pages/tool-info/PdfToWordInfoPage";
+import PdfToPowerpointInfoPage from "./pages/tool-info/PdfToPowerpointInfoPage";
+import PdfToExcelInfoPage from "./pages/tool-info/PdfToExcelInfoPage";
+import QrCodeGeneratorInfoPage from "./pages/tool-info/QrCodeGeneratorInfoPage";
+import LinkShortenerInfoPage from "./pages/tool-info/LinkShortenerInfoPage";
+import PdfToJpgInfoPage from "./pages/tool-info/PdfToJpgInfoPage";
+import WordToPdfInfoPage from "./pages/tool-info/WordToPdfInfoPage";
+import PowerpointToPdfInfoPage from "./pages/tool-info/PowerpointToPdfInfoPage";
+import ExcelToPdfInfoPage from "./pages/tool-info/ExcelToPdfInfoPage";
+import JpgToPdfInfoPage from "./pages/tool-info/JpgToPdfInfoPage";
+import WatermarkPdfInfoPage from "./pages/tool-info/WatermarkPdfInfoPage";
+import SignPdfInfoPage from "./pages/tool-info/SignPdfInfoPage";
+import MainLayout from "@/components/layout/MainLayout";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +98,34 @@ const App = () => (
           <Route path="/dashboard/audio-trimmer" element={<Dashboard><AudioTrimmerPage /></Dashboard>} />
           <Route path="/dashboard/calendar-generator" element={<Dashboard><CalendarGeneratorPage /></Dashboard>} />
           <Route path="/dashboard/invoice-generator" element={<Dashboard><InvoiceGeneratorPage /></Dashboard>} />
+          {/* Tool Info Pages */}
+          <Route element={<MainLayout />}>
+            <Route path="/info/merge-pdf" element={<MergePdfInfoPage />} />
+            <Route path="/info/rotate-pdf" element={<RotatePdfInfoPage />} />
+            <Route path="/info/protect-pdf" element={<ProtectPdfInfoPage />} />
+            <Route path="/info/redact-pdf" element={<RedactPdfInfoPage />} />
+            <Route path="/info/audio-to-text" element={<AudioToTextInfoPage />} />
+            <Route path="/info/live-transcription" element={<LiveTranscriptionInfoPage />} />
+            <Route path="/info/text-editor" element={<TextEditorInfoPage />} />
+            <Route path="/info/resume-builder" element={<ResumeBuilderInfoPage />} />
+            <Route path="/info/audio-trimmer" element={<AudioTrimmerInfoPage />} />
+            <Route path="/info/calendar-generator" element={<CalendarGeneratorInfoPage />} />
+            <Route path="/info/invoice-generator" element={<InvoiceGeneratorInfoPage />} />
+            <Route path="/info/compress-pdf" element={<CompressPdfInfoPage />} />
+            <Route path="/info/split-pdf" element={<SplitPdfInfoPage />} />
+            <Route path="/info/pdf-to-word" element={<PdfToWordInfoPage />} />
+            <Route path="/info/pdf-to-powerpoint" element={<PdfToPowerpointInfoPage />} />
+            <Route path="/info/powerpoint-to-pdf" element={<PowerpointToPdfInfoPage />} />
+            <Route path="/info/pdf-to-excel" element={<PdfToExcelInfoPage />} />
+            <Route path="/info/qr-code-generator" element={<QrCodeGeneratorInfoPage />} />
+                        <Route path="/info/link-shortener" element={<LinkShortenerInfoPage />} />
+            <Route path="/info/pdf-to-jpg" element={<PdfToJpgInfoPage />} />
+                        <Route path="/info/word-to-pdf" element={<WordToPdfInfoPage />} />
+                        <Route path="/info/excel-to-pdf" element={<ExcelToPdfInfoPage />} />
+            <Route path="/info/jpg-to-pdf" element={<JpgToPdfInfoPage />} />
+            <Route path="/info/watermark-pdf" element={<WatermarkPdfInfoPage />} />
+            <Route path="/info/sign-pdf" element={<SignPdfInfoPage />} />
+          </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
